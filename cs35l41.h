@@ -62,38 +62,6 @@ typedef struct CSAUDIOARG {
 	};
 } CsAudioArg, * PCsAudioArg;
 
-typedef struct
-{
-	uint32_t sym_id;
-	uint32_t sym_addr;
-} fw_img_v1_sym_table_t;
-
-typedef struct
-{
-	uint32_t img_magic_number_1;
-	uint32_t img_format_rev;
-} fw_img_preheader_t;
-
-typedef struct
-{
-	uint32_t img_size;
-	uint32_t sym_table_size;
-	uint32_t alg_id_list_size;
-	uint32_t fw_id;
-	uint32_t fw_version;
-	uint32_t data_blocks;
-	uint32_t max_block_size;
-	uint32_t fw_img_release;
-} fw_img_v2_header_t;
-
-typedef struct
-{
-	fw_img_preheader_t preheader;
-	fw_img_v2_header_t header;
-	fw_img_v1_sym_table_t* sym_table;
-	uint32_t* alg_id_list;
-} fw_img_info_t;
-
 typedef struct _CS35L41_CONTEXT
 {
 
@@ -114,8 +82,6 @@ typedef struct _CS35L41_CONTEXT
 	PVOID CSAudioAPICallbackObj;
 
 	BOOLEAN CSAudioManaged;
-
-	fw_img_info_t fw_img_info;
 
 } CS35L41_CONTEXT, *PCS35L41_CONTEXT;
 

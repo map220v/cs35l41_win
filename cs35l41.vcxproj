@@ -139,19 +139,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cs35l41.c" />
-    <ClCompile Include="cs35l41_fw.c" />
-    <ClInclude Include="cs35l41_fw.h" />
-    <ClCompile Include="firmware\cs35l41_bl_prot_fw_img.c" />
-    <ClCompile Include="firmware\cs35l41_br_prot_fw_img.c" />
-    <ClCompile Include="firmware\cs35l41_fw_img.c" />
-    <ClCompile Include="firmware\cs35l41_tl_prot_fw_img.c" />
-    <ClCompile Include="firmware\cs35l41_tr_prot_fw_img.c" />
     <ClCompile Include="spb.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cs35l41.h" />
-    <ClInclude Include="firmware\cs35l41_fw_img.h" />
-    <ClInclude Include="firmware\cs35l41_prot_fw_img.h" />
     <ClInclude Include="registers.h" />
     <ClInclude Include="spb.h" />
     <ClInclude Include="trace.h" />

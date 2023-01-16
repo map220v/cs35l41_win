@@ -1,6 +1,5 @@
 #include "cs35l41.h"
 #include "registers.h"
-#include "cs35l41_fw.h"
 
 #define bool int
 
@@ -611,161 +610,6 @@ void msleep(ULONG msec) {
 	udelay(msec * 1000);
 }
 
-static bool cs35l41_check_cspl_mbox_sts(enum cs35l41_cspl_mbox_cmd cmd,
-	enum cs35l41_cspl_mbox_status sts)
-{
-	switch (cmd) {
-	case CSPL_MBOX_CMD_NONE:
-	case CSPL_MBOX_CMD_UNKNOWN_CMD:
-		return true;
-	case CSPL_MBOX_CMD_PAUSE:
-	case CSPL_MBOX_CMD_OUT_OF_HIBERNATE:
-		return (sts == CSPL_MBOX_STS_PAUSED);
-	case CSPL_MBOX_CMD_RESUME:
-		return (sts == CSPL_MBOX_STS_RUNNING);
-	case CSPL_MBOX_CMD_REINIT:
-		return (sts == CSPL_MBOX_STS_RUNNING);
-	case CSPL_MBOX_CMD_STOP_PRE_REINIT:
-		return (sts == CSPL_MBOX_STS_RDY_FOR_REINIT);
-	default:
-		return false;
-	}
-}
-
-NTSTATUS cs35l41_set_cspl_mbox_cmd(PCS35L41_CONTEXT pDevice, enum cs35l41_cspl_mbox_cmd cmd)
-{
-	unsigned int sts = 0, i;
-	int ret;
-
-	// Set mailbox cmd
-	ret = cs35l41_reg_write(pDevice, CS35L41_DSP_VIRT1_MBOX_1, cmd);
-	if (ret < 0) {
-		if (cmd != CSPL_MBOX_CMD_OUT_OF_HIBERNATE) {
-			Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_INIT, "Failed to write MBOX: %d\n", ret);
-		}
-		return ret;
-	}
-
-	// Read mailbox status and verify it is appropriate for the given cmd
-	for (i = 0; i < 5; i++) {
-		udelay(1000);
-
-		ret = cs35l41_reg_read(pDevice, CS35L41_DSP_MBOX_2, &sts);
-		if (ret < 0) {
-			Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_INIT, "Failed to read MBOX STS: %d\n", ret);
-			continue;
-		}
-
-		if (!cs35l41_check_cspl_mbox_sts(cmd, sts)) {
-			Cs35l41Print(DEBUG_LEVEL_VERBOSE, DBG_INIT, "[%u] cmd %u returned invalid sts %u", i, cmd, sts);
-		}
-		else
-			return 0;
-	}
-
-	if (cmd != CSPL_MBOX_CMD_OUT_OF_HIBERNATE)
-		Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_INIT, "Failed to set mailbox cmd %u (status %u)\n", cmd, sts);
-
-	return STATUS_INVALID_PARAMETER;
-}
-
-static NTSTATUS cs35l41_dsp_init(PCS35L41_CONTEXT pDevice)
-{
-	int ret;
-
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX1_RATE, 0x00000001);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX2_RATE, 0x00000001);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX3_RATE, 0x00000001);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX4_RATE, 0x00000001);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX5_RATE, 0x00000001);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX6_RATE, 0x00000001);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX7_RATE, 0x00000001);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX8_RATE, 0x00000001);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_TX1_RATE, 0x00000001);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_TX2_RATE, 0x00000001);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_TX3_RATE, 0x00000001);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_TX4_RATE, 0x00000001);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_TX5_RATE, 0x00000001);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_TX6_RATE, 0x00000001);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_TX7_RATE, 0x00000001);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_TX8_RATE, 0x00000001);
-
-	ret = cs_dsp_load(pDevice);
-	if (ret) {
-		Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_INIT,
-			"DSP Firmware load failed: %X\n", ret);
-		return ret;
-	}
-
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX5_SRC, CS35L41_INPUT_SRC_VPMON);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX6_SRC, CS35L41_INPUT_SRC_CLASSH);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX7_SRC, CS35L41_INPUT_SRC_TEMPMON);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX8_SRC, CS35L41_INPUT_SRC_RSVD);
-
-	//TODO: cs_dsp_coeff_sync_controls
-
-	//HALO DSP Memory lock
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_LOCK_CONFIG, 0x00005555);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_LOCK_CONFIG, 0x0000AAAA);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_XMEM_ACCESS_0, 0xFFFFFFFF);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_YMEM_ACCESS_0, 0xFFFFFFFF);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_WINDOW_ACCESS_0, 0xFFFFFFFF);//lock_regions 
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_XREG_ACCESS_0, 0xFFFFFFFF);//lock_regions 
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_YREG_ACCESS_0, 0xFFFFFFFF);//lock_regions 
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_XMEM_ACCESS_1, 0xFFFFFFFF);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_YMEM_ACCESS_1, 0xFFFFFFFF);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_WINDOW_ACCESS_1, 0xFFFFFFFF);//lock_regions 
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_XREG_ACCESS_1, 0xFFFFFFFF);//lock_regions 
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_YREG_ACCESS_1, 0xFFFFFFFF);//lock_regions 
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_XMEM_ACCESS_2, 0xFFFFFFFF);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_YMEM_ACCESS_2, 0xFFFFFFFF);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_WINDOW_ACCESS_2, 0xFFFFFFFF);//lock_regions 
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_XREG_ACCESS_2, 0xFFFFFFFF);//lock_regions 
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_YREG_ACCESS_2, 0xFFFFFFFF);//lock_regions 
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_XMEM_ACCESS_3, 0xFFFFFFFF);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_YMEM_ACCESS_3, 0xFFFFFFFF);
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_WINDOW_ACCESS_3, 0xFFFFFFFF);//lock_regions 
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_XREG_ACCESS_3, 0xFFFFFFFF);//lock_regions 
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_YREG_ACCESS_3, 0xFFFFFFFF);//lock_regions 
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_MPU_LOCK_CONFIG, 0x00000000);
-
-	return ret;
-}
-static NTSTATUS cs35l41_dsp_start(PCS35L41_CONTEXT pDevice)
-{
-	int ret;
-
-	ret = cs35l41_reg_update_bits(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_CCM_CORE_CONTROL,
-		HALO_CORE_RESET | HALO_CORE_EN,
-		HALO_CORE_RESET | HALO_CORE_EN);
-
-	if (ret)
-		return ret;
-
-	return cs35l41_reg_update_bits(pDevice, CS35L41_DSP1_CTRL_BASE + HALO_CCM_CORE_CONTROL,
-		HALO_CORE_RESET, 0);
-}
-
-static NTSTATUS cs35l41_dsp_mbox_start(PCS35L41_CONTEXT pDevice)
-{
-	unsigned int fw_status;
-
-	cs35l41_reg_read(pDevice, CS35L41_DSP_MBOX_2, &fw_status);
-
-	switch (fw_status) {
-	case CSPL_MBOX_STS_RUNNING:
-	case CSPL_MBOX_STS_PAUSED:
-		break;
-	default:
-		Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_INIT, "Firmware status is invalid: %u\n",
-			fw_status);
-		return STATUS_INVALID_PARAMETER;
-	}
-
-	return cs35l41_set_cspl_mbox_cmd(pDevice, CSPL_MBOX_CMD_RESUME);
-	
-}
-
 static NTSTATUS cs35l41_amp_enable(PCS35L41_CONTEXT pDevice)
 {
 	//int ret;
@@ -890,12 +734,141 @@ OnInterruptIsr(
 	IN ULONG MessageID
 )
 {
+	PCS35L41_CONTEXT pDevice;
+	NTSTATUS ret;
+
+	UNREFERENCED_PARAMETER(MessageID);
+
 	Cs35l41Print(DEBUG_LEVEL_VERBOSE, DBG_IOCTL,
 		"OnInterruptIsr - Entry");
 
+	ret = FALSE;
+	pDevice = GetDeviceContext(WdfInterruptGetDevice(Interrupt));
 
+	unsigned int status[4] = { 0, 0, 0, 0 };
+	unsigned int masks[4] = { 0, 0, 0, 0 };
+	unsigned int i;
 
-	return TRUE;
+	for (i = 0; i < sizeof(status) / sizeof(status[0]); i++) {
+		cs35l41_reg_read(pDevice,
+			CS35L41_IRQ1_STATUS1 + (i * CS35L41_REGSTRIDE),
+			&status[i]);
+		cs35l41_reg_read(pDevice,
+			CS35L41_IRQ1_MASK1 + (i * CS35L41_REGSTRIDE),
+			&masks[i]);
+	}
+
+	/* Check to see if unmasked bits are active */
+	if (!(status[0] & ~masks[0]) && !(status[1] & ~masks[1]) &&
+		!(status[2] & ~masks[2]) && !(status[3] & ~masks[3]))
+		goto done;
+
+	if (status[3] & CS35L41_OTP_BOOT_DONE) {
+		cs35l41_reg_update_bits(pDevice, CS35L41_IRQ1_MASK4,
+			CS35L41_OTP_BOOT_DONE, CS35L41_OTP_BOOT_DONE);
+	}
+
+	/*
+	 * The following interrupts require a
+	 * protection release cycle to get the
+	 * speaker out of Safe-Mode.
+	 */
+	if (status[0] & CS35L41_AMP_SHORT_ERR) {
+		Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_IOCTL, "Amp short error\n");
+		cs35l41_reg_write(pDevice, CS35L41_IRQ1_STATUS1,
+			CS35L41_AMP_SHORT_ERR);
+		cs35l41_reg_write(pDevice, CS35L41_PROTECT_REL_ERR_IGN, 0);
+		cs35l41_reg_update_bits(pDevice, CS35L41_PROTECT_REL_ERR_IGN,
+			CS35L41_AMP_SHORT_ERR_RLS,
+			CS35L41_AMP_SHORT_ERR_RLS);
+		cs35l41_reg_update_bits(pDevice, CS35L41_PROTECT_REL_ERR_IGN,
+			CS35L41_AMP_SHORT_ERR_RLS, 0);
+		ret = TRUE;
+	}
+
+	if (status[0] & CS35L41_TEMP_WARN) {
+		Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_IOCTL, "Over temperature warning\n");
+		cs35l41_reg_write(pDevice, CS35L41_IRQ1_STATUS1,
+			CS35L41_TEMP_WARN);
+		cs35l41_reg_write(pDevice, CS35L41_PROTECT_REL_ERR_IGN, 0);
+		cs35l41_reg_update_bits(pDevice, CS35L41_PROTECT_REL_ERR_IGN,
+			CS35L41_TEMP_WARN_ERR_RLS,
+			CS35L41_TEMP_WARN_ERR_RLS);
+		cs35l41_reg_update_bits(pDevice, CS35L41_PROTECT_REL_ERR_IGN,
+			CS35L41_TEMP_WARN_ERR_RLS, 0);
+		ret = TRUE;
+	}
+
+	if (status[0] & CS35L41_TEMP_ERR) {
+		Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_IOCTL, "Over temperature error\n");
+		cs35l41_reg_write(pDevice, CS35L41_IRQ1_STATUS1,
+			CS35L41_TEMP_ERR);
+		cs35l41_reg_write(pDevice, CS35L41_PROTECT_REL_ERR_IGN, 0);
+		cs35l41_reg_update_bits(pDevice, CS35L41_PROTECT_REL_ERR_IGN,
+			CS35L41_TEMP_ERR_RLS,
+			CS35L41_TEMP_ERR_RLS);
+		cs35l41_reg_update_bits(pDevice, CS35L41_PROTECT_REL_ERR_IGN,
+			CS35L41_TEMP_ERR_RLS, 0);
+		ret = TRUE;
+	}
+
+	if (status[0] & CS35L41_BST_OVP_ERR) {
+		Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_IOCTL, "VBST Over Voltage error\n");
+		cs35l41_reg_update_bits(pDevice, CS35L41_PWR_CTRL2,
+			CS35L41_BST_EN_MASK, 0);
+		cs35l41_reg_write(pDevice, CS35L41_IRQ1_STATUS1,
+			CS35L41_BST_OVP_ERR);
+		cs35l41_reg_write(pDevice, CS35L41_PROTECT_REL_ERR_IGN, 0);
+		cs35l41_reg_update_bits(pDevice, CS35L41_PROTECT_REL_ERR_IGN,
+			CS35L41_BST_OVP_ERR_RLS,
+			CS35L41_BST_OVP_ERR_RLS);
+		cs35l41_reg_update_bits(pDevice, CS35L41_PROTECT_REL_ERR_IGN,
+			CS35L41_BST_OVP_ERR_RLS, 0);
+		cs35l41_reg_update_bits(pDevice, CS35L41_PWR_CTRL2,
+			CS35L41_BST_EN_MASK,
+			CS35L41_BST_EN_DEFAULT << CS35L41_BST_EN_SHIFT);
+		ret = TRUE;
+	}
+
+	if (status[0] & CS35L41_BST_DCM_UVP_ERR) {
+		Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_IOCTL, "DCM VBST Under Voltage Error\n");
+		cs35l41_reg_update_bits(pDevice, CS35L41_PWR_CTRL2,
+			CS35L41_BST_EN_MASK, 0);
+		cs35l41_reg_write(pDevice, CS35L41_IRQ1_STATUS1,
+			CS35L41_BST_DCM_UVP_ERR);
+		cs35l41_reg_write(pDevice, CS35L41_PROTECT_REL_ERR_IGN, 0);
+		cs35l41_reg_update_bits(pDevice, CS35L41_PROTECT_REL_ERR_IGN,
+			CS35L41_BST_UVP_ERR_RLS,
+			CS35L41_BST_UVP_ERR_RLS);
+		cs35l41_reg_update_bits(pDevice, CS35L41_PROTECT_REL_ERR_IGN,
+			CS35L41_BST_UVP_ERR_RLS, 0);
+		cs35l41_reg_update_bits(pDevice, CS35L41_PWR_CTRL2,
+			CS35L41_BST_EN_MASK,
+			CS35L41_BST_EN_DEFAULT << CS35L41_BST_EN_SHIFT);
+		ret = TRUE;
+	}
+
+	if (status[0] & CS35L41_BST_SHORT_ERR) {
+		Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_IOCTL, "LBST error: powering off!\n");
+		cs35l41_reg_update_bits(pDevice, CS35L41_PWR_CTRL2,
+			CS35L41_BST_EN_MASK, 0);
+		cs35l41_reg_write(pDevice, CS35L41_IRQ1_STATUS1,
+			CS35L41_BST_SHORT_ERR);
+		cs35l41_reg_write(pDevice, CS35L41_PROTECT_REL_ERR_IGN, 0);
+		cs35l41_reg_update_bits(pDevice, CS35L41_PROTECT_REL_ERR_IGN,
+			CS35L41_BST_SHORT_ERR_RLS,
+			CS35L41_BST_SHORT_ERR_RLS);
+		cs35l41_reg_update_bits(pDevice, CS35L41_PROTECT_REL_ERR_IGN,
+			CS35L41_BST_SHORT_ERR_RLS, 0);
+		cs35l41_reg_update_bits(pDevice, CS35L41_PWR_CTRL2,
+			CS35L41_BST_EN_MASK,
+			CS35L41_BST_EN_DEFAULT << CS35L41_BST_EN_SHIFT);
+		ret = TRUE;
+	}
+
+done:
+
+	return ret;
 }
 
 NTSTATUS
@@ -999,12 +972,13 @@ StartCodec(
 	//ActiveHigh == func 5
 	gpio2.func = 4;
 	gpio2.valid = true;
-
+	//E1000001 downstream
 	cs35l41_reg_update_bits(pDevice, CS35L41_GPIO1_CTRL1,
 		CS35L41_GPIO_POL_MASK | CS35L41_GPIO_DIR_MASK,
 		gpio1.pol_inv << CS35L41_GPIO_POL_SHIFT |
 		!gpio1.out_en << CS35L41_GPIO_DIR_SHIFT);
 
+	//61000001 downstream
 	cs35l41_reg_update_bits(pDevice, CS35L41_GPIO2_CTRL1,
 		CS35L41_GPIO_POL_MASK | CS35L41_GPIO_DIR_MASK,
 		gpio2.pol_inv << CS35L41_GPIO_POL_SHIFT |
@@ -1041,76 +1015,84 @@ StartCodec(
 
 	//cirrus,asp-sdout-hiz
 	int dout_hiz = 3;
+
 	/* Optional */
 	if (dout_hiz <= CS35L41_ASP_DOUT_HIZ_MASK && dout_hiz >= 0)
 		cs35l41_reg_update_bits(pDevice, CS35L41_SP_HIZ_CTRL, CS35L41_ASP_DOUT_HIZ_MASK, dout_hiz);
 
-	status = cs35l41_dsp_init(pDevice);
-	if (!NT_SUCCESS(status)) {
-		return status;
-	}
-
-	//DSP1 Preload on
-	cs35l41_dsp_start(pDevice);
-
-	//TODO: wm_adsp_buffer_init
-
-	//DSP1 on
-	status = cs35l41_dsp_mbox_start(pDevice);
-	if (!NT_SUCCESS(status)) {
-		return status;
-	}
-
 	//Main AMP on
-	//cs35l41_amp_enable(pDevice);
+	cs35l41_amp_enable(pDevice);
 
-	/*
+	//670 downstream
+	//370 i2s
 	cs35l41_reg_write(pDevice, CS35L41_PLL_CLK_CTRL, 0x00000430); // 3072000Hz, BCLK Input, PLL_REFCLK_EN = 1
-	cs35l41_reg_write(pDevice,  CS35L41_DSP_CLK_CTRL, 0x00000003 ); // DSP CLK EN
-	cs35l41_reg_write(pDevice,  CS35L41_GLOBAL_CLK_CTRL, 0x00000003 ); // GLOBAL_FS = 48 kHz
-	cs35l41_reg_write(pDevice,  CS35L41_SP_ENABLES, 0x00010000 ); // ASP_RX1_EN = 1
-	cs35l41_reg_write(pDevice,  CS35L41_SP_RATE_CTRL, 0x00000021 ); // ASP_BCLK_FREQ = 3.072 MHz
-	cs35l41_reg_write(pDevice, CS35L41_SP_FORMAT, 0x10100200); // 16 bits RX/TX slots, I2S, clk consumer
-	//cs35l41_reg_write(pDevice,  CS35L41_SP_FORMAT, 0x20200200 ); // 32 bits RX/TX slots, I2S, clk consumer
-	//cs35l41_reg_write(pDevice,  CS35L41_SP_HIZ_CTRL, 0x00000002 ); // Hi-Z unused
-	cs35l41_reg_write(pDevice,  CS35L41_SP_TX_WL, 0x00000018 ); // 24 cycles/slot
-	cs35l41_reg_write(pDevice,  CS35L41_SP_RX_WL, 0x00000018 ); // 24 cycles/slot
-	cs35l41_reg_write(pDevice,  CS35L41_DAC_PCM1_SRC, 0x00000008 ); // DACPCM1_SRC = ASPRX1
-	cs35l41_reg_write(pDevice,  CS35L41_ASP_TX1_SRC, 0x00000018 ); // ASPTX1 SRC = VMON
-	cs35l41_reg_write(pDevice,  CS35L41_ASP_TX2_SRC, 0x00000019 ); // ASPTX2 SRC = IMON
-	cs35l41_reg_write(pDevice,  CS35L41_ASP_TX3_SRC, 0x00000032 ); // ASPTX3 SRC = ERRVOL
-	cs35l41_reg_write(pDevice,  CS35L41_ASP_TX4_SRC, 0x00000033 ); // ASPTX4 SRC = CLASSH_TGT
-	cs35l41_reg_write(pDevice,  CS35L41_DSP1_RX1_SRC, 0x00000008 ); // DSP1RX1 SRC = ASPRX1
-	cs35l41_reg_write(pDevice,  CS35L41_DSP1_RX2_SRC, 0x00000009 ); // DSP1RX2 SRC = ASPRX2
-	cs35l41_reg_write(pDevice,  CS35L41_DSP1_RX3_SRC, 0x00000018 ); // DSP1RX3 SRC = VMON
-	cs35l41_reg_write(pDevice,  CS35L41_DSP1_RX4_SRC, 0x00000019 ); // DSP1RX4 SRC = IMON
-	//cs35l41_reg_write(pDevice,  CS35L41_DSP1_RX5_SRC, 0x00000020 ); // DSP1RX5 SRC = ERRVOL
-	cs35l41_reg_write(pDevice,  CS35L41_AMP_DIG_VOL_CTRL, 0x00000000 ); // AMP_VOL_PCM  0.0 dB
-	cs35l41_reg_write(pDevice,  CS35L41_AMP_GAIN_CTRL, 0x00000084 ); // AMP_GAIN_PCM 4.5 dB
-	*/
-	
-	cs35l41_reg_write(pDevice, CS35L41_PLL_CLK_CTRL, 0x00000430); // 3072000Hz, BCLK Input, PLL_REFCLK_EN = 1
-	cs35l41_reg_write(pDevice, CS35L41_DSP_CLK_CTRL, 0x00000003); // DSP CLK EN
+	//cs35l41_reg_write(pDevice, CS35L41_DSP_CLK_CTRL, 0x00000003); // DSP CLK EN
 	cs35l41_reg_write(pDevice, CS35L41_GLOBAL_CLK_CTRL, 0x00000003); // GLOBAL_FS = 48 kHz
-	cs35l41_reg_write(pDevice, CS35L41_SP_ENABLES, 0x00010001); // ASP_RX1_EN = 1, ASP_TX1_EN = 1
+	cs35l41_reg_write(pDevice, CS35L41_SP_ENABLES, 0x00030001); // ASP_RX1_EN = 1 ASP_RX2_EN = 1 ASP_TX1_EN = 1
 	cs35l41_reg_write(pDevice, CS35L41_SP_RATE_CTRL, 0x00000021); // ASP_BCLK_FREQ = 3.072 MHz
+	//20200000 downstream *rx/tx *i2s/tdm clock slave/master is important
 	cs35l41_reg_write(pDevice, CS35L41_SP_FORMAT, 0x10100200); // 16 bits RX/TX slots, I2S, clk consumer
-	//cs35l41_reg_write(pDevice,  CS35L41_SP_FORMAT, 0x20200200 ); // 32 bits RX/TX slots, I2S, clk consumer
-	//cs35l41_reg_write(pDevice,  CS35L41_SP_HIZ_CTRL, 0x00000002 ); // Hi-Z unused/disabled
-	cs35l41_reg_write(pDevice, CS35L41_SP_TX_WL, 0x00000010); // 16 cycles/slot
-	cs35l41_reg_write(pDevice, CS35L41_SP_RX_WL, 0x00000010); // 16 cycles/slot
-	cs35l41_reg_write(pDevice, CS35L41_DAC_PCM1_SRC, 0x00000032); // DACPCM1_SRC = DSP
-	cs35l41_reg_write(pDevice, CS35L41_ASP_TX1_SRC, 0x00000032); // ASPTX1 SRC = DSP1RX1
+	//cs35l41_reg_write(pDevice, CS35L41_SP_FORMAT, 0x20200200 ); // 32 bits RX/TX slots, I2S, clk consumer
+	cs35l41_reg_write(pDevice, CS35L41_SP_HIZ_CTRL, 0x00000002); // Hi-Z unused
+	cs35l41_reg_write(pDevice, CS35L41_SP_TX_WL, 0x00000018); // 24 cycles/slot
+	cs35l41_reg_write(pDevice, CS35L41_SP_RX_WL, 0x00000018); // 24 cycles/slot
+	cs35l41_reg_write(pDevice, CS35L41_DAC_PCM1_SRC, 0x00000008); // DACPCM1_SRC = ASPRX1
+	cs35l41_reg_write(pDevice, CS35L41_ASP_TX1_SRC, 0x00000032); // ASPTX1 SRC = DSPTX1
 	cs35l41_reg_write(pDevice, CS35L41_ASP_TX2_SRC, 0x00000000); // ASPTX2 SRC = Zero
-	cs35l41_reg_write(pDevice, CS35L41_ASP_TX3_SRC, 0x00000000); // ASPTX3 SRC = Zero
-	cs35l41_reg_write(pDevice, CS35L41_ASP_TX4_SRC, 0x00000000); // ASPTX4 SRC = Zero
+	cs35l41_reg_write(pDevice, CS35L41_ASP_TX3_SRC, 0x00000020); // ASPTX3 SRC = ???
+	cs35l41_reg_write(pDevice, CS35L41_ASP_TX4_SRC, 0x00000021); // ASPTX4 SRC = CLASSH
 	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX1_SRC, 0x00000008); // DSP1RX1 SRC = ASPRX1
 	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX2_SRC, 0x00000009); // DSP1RX2 SRC = ASPRX2
-	//cs35l41_reg_write(pDevice, CS35L41_DSP1_RX3_SRC, 0x00000018); // DSP1RX3 SRC = VMON
-	//cs35l41_reg_write(pDevice, CS35L41_DSP1_RX4_SRC, 0x00000019); // DSP1RX4 SRC = IMON
-	//cs35l41_reg_write(pDevice,  CS35L41_DSP1_RX5_SRC, 0x00000020 ); // DSP1RX5 SRC = ERRVOL
-	cs35l41_reg_write(pDevice, CS35L41_AMP_DIG_VOL_CTRL, 0x00000003 ); // AMP_VOL_PCM = 4ms CHECKIT TODO
-	cs35l41_reg_write(pDevice, CS35L41_AMP_GAIN_CTRL, 0x00000233 ); // AMP_GAIN_PCM = 17.5dB AMP_GAIN_PDM = 19.5dB
+	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX3_SRC, 0x00000018); // DSP1RX3 SRC = VMON
+	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX4_SRC, 0x00000019); // DSP1RX4 SRC = IMON
+	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX5_SRC, 0x00000020); // DSP1RX5 SRC = ERRVOL
+	//8004 downstream 8000 volume amp. 4* 4ms
+	cs35l41_reg_write(pDevice, CS35L41_AMP_DIG_VOL_CTRL, 0x00008004); // AMP_VOL_PCM = 4ms 
+	//253 downstream
+	cs35l41_reg_write(pDevice, CS35L41_AMP_GAIN_CTRL, 0x00000233); // AMP_GAIN_PCM = 17.5dB AMP_GAIN_PDM = 19.5dB
+	//cs35l41_reg_write(pDevice, CS35L41_PWR_CTRL2, 0x00000021);
+	cs35l41_reg_write(pDevice, CS35L41_PWR_CTRL2, 0x00003721);
+	cs35l41_reg_write(pDevice, CS35L41_PWR_CTRL3, 0x01100010);
+
+	//TODO add cs35l41_dai_set_sysclk etc
+
+	cs35l41_reg_update_bits(pDevice, CS35L41_SP_FORMAT,
+		CS35L41_ASP_FMT_MASK,
+		2 << CS35L41_ASP_FMT_SHIFT);
+
+	cs35l41_reg_update_bits(pDevice, CS35L41_SP_FORMAT,
+		CS35L41_SCLK_MSTR_MASK,
+		0 << CS35L41_SCLK_MSTR_SHIFT);
+	cs35l41_reg_update_bits(pDevice, CS35L41_SP_FORMAT,
+		CS35L41_LRCLK_MSTR_MASK,
+		0 << CS35L41_LRCLK_MSTR_SHIFT);
+
+	cs35l41_reg_update_bits(pDevice, CS35L41_AMP_DIG_VOL_CTRL,
+		CS35L41_AMP_PCM_VOL_MASK,
+		0 << CS35L41_AMP_PCM_VOL_SHIFT);
+
+	cs35l41_reg_update_bits(pDevice, CS35L41_SP_FORMAT,
+		CS35L41_LRCLK_INV_MASK,
+		0 << CS35L41_LRCLK_INV_SHIFT);
+	cs35l41_reg_update_bits(pDevice, CS35L41_SP_FORMAT,
+		CS35L41_SCLK_INV_MASK,
+		0 << CS35L41_SCLK_INV_SHIFT);
+
+	unsigned int fs1_val = 0x34;
+	unsigned int fs2_val = 0x54;
+	unsigned int val;
+	
+	val = fs1_val;
+	val |= (fs2_val << CS35L41_FS2_WINDOW_SHIFT) & CS35L41_FS2_WINDOW_MASK;
+	cs35l41_reg_write(pDevice, CS35L41_TEST_KEY_CTL, 0x00000055);
+	cs35l41_reg_write(pDevice, CS35L41_TEST_KEY_CTL, 0x000000AA);
+	cs35l41_reg_write(pDevice, CS35L41_TST_FS_MON0, val);
+	cs35l41_reg_write(pDevice, CS35L41_TEST_KEY_CTL, 0x000000CC);
+	cs35l41_reg_write(pDevice, CS35L41_TEST_KEY_CTL, 0x00000033);
+
+	cs35l41_reg_update_bits(pDevice,
+		CS35L41_SP_RATE_CTRL, 0x3F,
+		0x33);
 
 	cs35l41_reg_update_bits(pDevice, CS35L41_PLL_CLK_CTRL,
 		CS35L41_PLL_OPENLOOP_MASK,
@@ -1122,7 +1104,7 @@ StartCodec(
 		CS35L41_PLL_CLK_EN_MASK,
 		0 << CS35L41_PLL_CLK_EN_SHIFT);
 	cs35l41_reg_update_bits(pDevice, CS35L41_PLL_CLK_CTRL,
-		CS35L41_PLL_CLK_SEL_MASK, CS35L41_PLLSRC_SCLK);
+		CS35L41_PLL_CLK_SEL_MASK, CS35L41_PLLSRC_SCLK);//Clock might be wrong for i2s
 	cs35l41_reg_update_bits(pDevice, CS35L41_PLL_CLK_CTRL,
 		CS35L41_PLL_OPENLOOP_MASK,
 		0 << CS35L41_PLL_OPENLOOP_SHIFT);
@@ -1130,11 +1112,20 @@ StartCodec(
 		CS35L41_PLL_CLK_EN_MASK,
 		1 << CS35L41_PLL_CLK_EN_SHIFT);
 
-	cs35l41_reg_update_bits(pDevice, CS35L41_SP_RATE_CTRL, 0x3F, 0x33);
+	//504 downstream tdm
+	cs35l41_reg_update_bits(pDevice,
+		CS35L41_SP_FRAME_RX_SLOT,
+		CS35L41_ASP_RX1_SLOT_MASK,
+		((true) ? 1 : 0)
+		<< CS35L41_ASP_RX1_SLOT_SHIFT);
+	cs35l41_reg_update_bits(pDevice,
+		CS35L41_SP_FRAME_RX_SLOT,
+		CS35L41_ASP_RX2_SLOT_MASK,
+		((true) ? 0 : 1)
+		<< CS35L41_ASP_RX2_SLOT_SHIFT);
 
-	cs35l41_reg_update_bits(pDevice, CS35L41_AMP_DIG_VOL_CTRL,
-		CS35L41_AMP_PCM_VOL_MASK,
-		0 << CS35L41_AMP_PCM_VOL_SHIFT);
+	Cs35l41Print(DEBUG_LEVEL_INFO, DBG_INIT,
+		"Started! REV:%X UID:%d\n", reg_revid, pDevice->UID);
 
 	pDevice->DevicePoweredOn = TRUE;
 	return status;
@@ -1147,11 +1138,6 @@ StopCodec(
 	NTSTATUS status = STATUS_SUCCESS;
 
 	//status = cs35l41_reg_write(pDevice, CS35L41_SFT_RESET, 1);
-
-	if (pDevice->fw_img_info.sym_table)
-		ExFreePoolWithTag(pDevice->fw_img_info.sym_table, CS35L41_POOL_TAG);
-	if (pDevice->fw_img_info.alg_id_list)
-		ExFreePoolWithTag(pDevice->fw_img_info.alg_id_list, CS35L41_POOL_TAG);
 
 	pDevice->DevicePoweredOn = FALSE;
 	return status;
