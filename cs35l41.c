@@ -745,21 +745,8 @@ static NTSTATUS cs35l41_pcm_hw_params(PCS35L41_CONTEXT pDevice)
 		CS35L41_ASP_RX_WL_MASK,
 		asp_wl << CS35L41_ASP_RX_WL_SHIFT);
 
-	//504 downstream tdm
 	//TODO: Add speaker orientation change
-	if (pDevice->UID == 0 || pDevice->UID == 1) {
-		cs35l41_reg_update_bits(pDevice,
-			CS35L41_SP_FRAME_RX_SLOT,
-			CS35L41_ASP_RX1_SLOT_MASK, 0
-			<< CS35L41_ASP_RX1_SLOT_SHIFT);
-		cs35l41_reg_update_bits(pDevice,
-			CS35L41_SP_FRAME_RX_SLOT,
-			CS35L41_ASP_RX2_SLOT_MASK, 1
-			<< CS35L41_ASP_RX2_SLOT_SHIFT);
-		Cs35l41Print(DEBUG_LEVEL_INFO, DBG_INIT,
-			"Right Slot UID:%d\n", pDevice->UID);
-	}
-	else {
+	if (pDevice->UID == 0 || pDevice->UID == 2) {
 		cs35l41_reg_update_bits(pDevice,
 			CS35L41_SP_FRAME_RX_SLOT,
 			CS35L41_ASP_RX1_SLOT_MASK, 1
@@ -767,6 +754,18 @@ static NTSTATUS cs35l41_pcm_hw_params(PCS35L41_CONTEXT pDevice)
 		cs35l41_reg_update_bits(pDevice,
 			CS35L41_SP_FRAME_RX_SLOT,
 			CS35L41_ASP_RX2_SLOT_MASK, 0
+			<< CS35L41_ASP_RX2_SLOT_SHIFT);
+		Cs35l41Print(DEBUG_LEVEL_INFO, DBG_INIT,
+			"Right Slot UID:%d\n", pDevice->UID);
+	}
+	else {
+		cs35l41_reg_update_bits(pDevice,
+			CS35L41_SP_FRAME_RX_SLOT,
+			CS35L41_ASP_RX1_SLOT_MASK, 0
+			<< CS35L41_ASP_RX1_SLOT_SHIFT);
+		cs35l41_reg_update_bits(pDevice,
+			CS35L41_SP_FRAME_RX_SLOT,
+			CS35L41_ASP_RX2_SLOT_MASK, 1
 			<< CS35L41_ASP_RX2_SLOT_SHIFT);
 		Cs35l41Print(DEBUG_LEVEL_INFO, DBG_INIT,
 			"Left Slot UID:%d\n", pDevice->UID);
@@ -1214,7 +1213,8 @@ StartCodec(
 	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX4_SRC, 0x00000019); // DSP1RX4 SRC = IMON
 	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX5_SRC, 0x00000020); // DSP1RX5 SRC = ERRVOL
 	*/
-	cs35l41_reg_write(pDevice, CS35L41_AMP_GAIN_CTRL, 0x00000253);
+	//cs35l41_reg_write(pDevice, CS35L41_AMP_GAIN_CTRL, 0x00000253);
+	cs35l41_reg_write(pDevice, CS35L41_AMP_GAIN_CTRL, 0x00000153);
 
 	cs35l41_reg_write(pDevice, CS35L41_PWR_CTRL2, 0x00003721);
 
