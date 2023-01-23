@@ -727,6 +727,17 @@
 #define CS35L41_SPI_MAX_FREQ		4000000
 #define CS35L41_REGSTRIDE		4
 
+#define Q6AFE_LPASS_IBIT_CLK_8_P192_MHZ		0x7D0000
+#define Q6AFE_LPASS_IBIT_CLK_6_P144_MHZ		0x5DC000
+#define Q6AFE_LPASS_IBIT_CLK_4_P096_MHZ		0x3E8000
+#define Q6AFE_LPASS_IBIT_CLK_3_P072_MHZ		0x2EE000
+#define Q6AFE_LPASS_IBIT_CLK_2_P048_MHZ		0x1F4000
+#define Q6AFE_LPASS_IBIT_CLK_1_P536_MHZ		0x177000
+#define Q6AFE_LPASS_IBIT_CLK_1_P024_MHZ		 0xFA000
+#define Q6AFE_LPASS_IBIT_CLK_768_KHZ		 0xBB800
+#define Q6AFE_LPASS_IBIT_CLK_512_KHZ		 0x7D000
+#define Q6AFE_LPASS_IBIT_CLK_DISABLE		     0x0
+
 enum cs35l41_boost_type {
 	CS35L41_INT_BOOST,
 	CS35L41_EXT_BOOST,
@@ -793,22 +804,76 @@ struct cs35l41_otp_map_element_t {
 	unsigned int word_offset;
 };
 
-enum cs35l41_cspl_mbox_status {
-	CSPL_MBOX_STS_RUNNING = 0,
-	CSPL_MBOX_STS_PAUSED = 1,
-	CSPL_MBOX_STS_RDY_FOR_REINIT = 2,
-};
+struct cs35l41_pll_sysclk_config {
+	int freq;
+	int clk_cfg;
+} pll_sysclk_config;
 
-enum cs35l41_cspl_mbox_cmd {
-	CSPL_MBOX_CMD_NONE = 0,
-	CSPL_MBOX_CMD_PAUSE = 1,
-	CSPL_MBOX_CMD_RESUME = 2,
-	CSPL_MBOX_CMD_REINIT = 3,
-	CSPL_MBOX_CMD_STOP_PRE_REINIT = 4,
-	CSPL_MBOX_CMD_HIBERNATE = 5,
-	CSPL_MBOX_CMD_OUT_OF_HIBERNATE = 6,
-	CSPL_MBOX_CMD_UNKNOWN_CMD = -1,
-	CSPL_MBOX_CMD_INVALID_SEQUENCE = -2,
+static const struct cs35l41_pll_sysclk_config cs35l41_pll_sysclk[] = {
+	{ 32768,	0x00 },
+	{ 8000,		0x01 },
+	{ 11025,	0x02 },
+	{ 12000,	0x03 },
+	{ 16000,	0x04 },
+	{ 22050,	0x05 },
+	{ 24000,	0x06 },
+	{ 32000,	0x07 },
+	{ 44100,	0x08 },
+	{ 48000,	0x09 },
+	{ 88200,	0x0A },
+	{ 96000,	0x0B },
+	{ 128000,	0x0C },
+	{ 176400,	0x0D },
+	{ 192000,	0x0E },
+	{ 256000,	0x0F },
+	{ 352800,	0x10 },
+	{ 384000,	0x11 },
+	{ 512000,	0x12 },
+	{ 705600,	0x13 },
+	{ 750000,	0x14 },
+	{ 768000,	0x15 },
+	{ 1000000,	0x16 },
+	{ 1024000,	0x17 },
+	{ 1200000,	0x18 },
+	{ 1411200,	0x19 },
+	{ 1500000,	0x1A },
+	{ 1536000,	0x1B },
+	{ 2000000,	0x1C },
+	{ 2048000,	0x1D },
+	{ 2400000,	0x1E },
+	{ 2822400,	0x1F },
+	{ 3000000,	0x20 },
+	{ 3072000,	0x21 },
+	{ 3200000,	0x22 },
+	{ 4000000,	0x23 },
+	{ 4096000,	0x24 },
+	{ 4800000,	0x25 },
+	{ 5644800,	0x26 },
+	{ 6000000,	0x27 },
+	{ 6144000,	0x28 },
+	{ 6250000,	0x29 },
+	{ 6400000,	0x2A },
+	{ 6500000,	0x2B },
+	{ 6750000,	0x2C },
+	{ 7526400,	0x2D },
+	{ 8000000,	0x2E },
+	{ 8192000,	0x2F },
+	{ 9600000,	0x30 },
+	{ 11289600,	0x31 },
+	{ 12000000,	0x32 },
+	{ 12288000,	0x33 },
+	{ 12500000,	0x34 },
+	{ 12800000,	0x35 },
+	{ 13000000,	0x36 },
+	{ 13500000,	0x37 },
+	{ 19200000,	0x38 },
+	{ 22579200,	0x39 },
+	{ 24000000,	0x3A },
+	{ 24576000,	0x3B },
+	{ 25000000,	0x3C },
+	{ 25600000,	0x3D },
+	{ 26000000,	0x3E },
+	{ 27000000,	0x3F },
 };
 
 //Copy pasted linux GENMASK

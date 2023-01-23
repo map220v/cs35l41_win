@@ -115,7 +115,7 @@ NTSTATUS cs35l41_reg_bulk_write(PCS35L41_CONTEXT pDevice, uint32_t reg, uint8_t*
 #define DBG_PNP   2
 #define DBG_IOCTL 4
 
-#if 1
+#if 0
 #define Cs35l41Print(dbglevel, dbgcatagory, fmt, ...) {          \
     if (Cs35l41DebugLevel >= dbglevel &&                         \
         (Cs35l41DebugCatagories && dbgcatagory))                 \
