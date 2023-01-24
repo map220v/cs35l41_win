@@ -3,42 +3,14 @@
   <ItemGroup>
     <ClCompile Include="cs35l41.c" />
     <ClCompile Include="spb.c" />
-    <ClCompile Include="firmware\cs35l41_fw_img.c">
-      <Filter>firmware</Filter>
-    </ClCompile>
-    <ClCompile Include="firmware\cs35l41_bl_prot_fw_img.c">
-      <Filter>firmware</Filter>
-    </ClCompile>
-    <ClCompile Include="firmware\cs35l41_br_prot_fw_img.c">
-      <Filter>firmware</Filter>
-    </ClCompile>
-    <ClCompile Include="firmware\cs35l41_tl_prot_fw_img.c">
-      <Filter>firmware</Filter>
-    </ClCompile>
-    <ClCompile Include="firmware\cs35l41_tr_prot_fw_img.c">
-      <Filter>firmware</Filter>
-    </ClCompile>
-    <ClCompile Include="cs35l41_fw.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cs35l41.h" />
     <ClInclude Include="registers.h" />
     <ClInclude Include="spb.h" />
     <ClInclude Include="trace.h" />
-    <ClInclude Include="firmware\cs35l41_fw_img.h">
-      <Filter>firmware</Filter>
-    </ClInclude>
-    <ClInclude Include="firmware\cs35l41_prot_fw_img.h">
-      <Filter>firmware</Filter>
-    </ClInclude>
-    <ClInclude Include="cs35l41_fw.h" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="cs35l41.inf" />
-  </ItemGroup>
-  <ItemGroup>
-    <Filter Include="firmware">
-      <UniqueIdentifier>{b79e84f7-26bb-40c3-a404-1a9dde088b9b}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
 </Project>

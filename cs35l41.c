@@ -299,9 +299,9 @@ NTSTATUS cs35l41_get_clk_config(int freq)
 	return STATUS_INVALID_PARAMETER;
 }
 
-NTSTATUS cs35l41_reg_write(PCS35L41_CONTEXT pDevice, uint32_t reg, uint32_t data)
+NTSTATUS cs35l41_reg_write(PCS35L41_CONTEXT pDevice, unsigned int reg, unsigned int data)
 {
-	uint8_t buf[8];
+	unsigned char buf[8];
 
 	buf[0] = (reg >> 24) & 0xFF;
 	buf[1] = (reg >> 16) & 0xFF;
@@ -315,9 +315,9 @@ NTSTATUS cs35l41_reg_write(PCS35L41_CONTEXT pDevice, uint32_t reg, uint32_t data
 	return SpbWriteDataSynchronously(&pDevice->I2CContext, buf, sizeof(buf));
 }
 
-NTSTATUS cs35l41_reg_bulk_write(PCS35L41_CONTEXT pDevice, uint32_t reg, uint8_t* data, uint32_t length)
+NTSTATUS cs35l41_reg_bulk_write(PCS35L41_CONTEXT pDevice, unsigned int reg, unsigned char* data, unsigned int length)
 {
-	uint8_t buf[4];
+	unsigned char buf[4];
 
 	buf[0] = (reg >> 24) & 0xFF;
 	buf[1] = (reg >> 16) & 0xFF;
@@ -329,19 +329,19 @@ NTSTATUS cs35l41_reg_bulk_write(PCS35L41_CONTEXT pDevice, uint32_t reg, uint8_t*
 
 NTSTATUS cs35l41_reg_read(
 	_In_ PCS35L41_CONTEXT pDevice,
-	uint32_t reg,
-	uint32_t* data
+	unsigned int reg,
+	unsigned int* data
 ) {
 	NTSTATUS status;
-	uint8_t buf[4];
+	unsigned char buf[4];
 
 	buf[0] = (reg >> 24) & 0xFF;
 	buf[1] = (reg >> 16) & 0xFF;
 	buf[2] = (reg >> 8) & 0xFF;
 	buf[3] = reg & 0xFF;
 
-	uint32_t raw_data = 0;
-	status = SpbWriteRead(&pDevice->I2CContext, &buf, sizeof(uint32_t), &raw_data, sizeof(uint32_t), 0);
+	unsigned int raw_data = 0;
+	status = SpbWriteRead(&pDevice->I2CContext, &buf, sizeof(unsigned int), &raw_data, sizeof(unsigned int), 0);
 	*data = RtlUlongByteSwap(raw_data);
 
 	return status;
@@ -349,13 +349,13 @@ NTSTATUS cs35l41_reg_read(
 
 NTSTATUS cs35l41_reg_bulk_read(
 	_In_ PCS35L41_CONTEXT pDevice,
-	uint32_t reg,
-	uint32_t* data,
-	uint32_t length
+	unsigned int reg,
+	unsigned int* data,
+	unsigned int length
 ) {
 	NTSTATUS status = STATUS_IO_DEVICE_ERROR;
-	uint8_t buf[4];
-	uint32_t raw_data;
+	unsigned char buf[4];
+	unsigned int raw_data;
 
 	for (int i = 0; i < length; i++) {
 		buf[0] = (reg >> 24) & 0xFF;
@@ -363,7 +363,7 @@ NTSTATUS cs35l41_reg_bulk_read(
 		buf[2] = (reg >> 8) & 0xFF;
 		buf[3] = reg & 0xFF;
 
-		status = SpbWriteRead(&pDevice->I2CContext, &buf, sizeof(uint32_t), &raw_data, sizeof(uint32_t), 0);
+		status = SpbWriteRead(&pDevice->I2CContext, &buf, sizeof(unsigned int), &raw_data, sizeof(unsigned int), 0);
 		data[i] = RtlUlongByteSwap(raw_data);
 
 		reg = reg + 4;
@@ -372,10 +372,10 @@ NTSTATUS cs35l41_reg_bulk_read(
 	return status;
 }
 
-NTSTATUS cs35l41_reg_update_bits(PCS35L41_CONTEXT pDevice, uint32_t reg, uint32_t mask, uint32_t val)
+NTSTATUS cs35l41_reg_update_bits(PCS35L41_CONTEXT pDevice, unsigned int reg, unsigned int mask, unsigned int val)
 {
 	NTSTATUS status;
-	uint32_t temp_val, data;
+	unsigned int temp_val, data;
 
 	status = cs35l41_reg_read(pDevice, reg, &data);
 
@@ -417,8 +417,8 @@ NTSTATUS cs35l41_otp_unpack(PCS35L41_CONTEXT pDevice)
 	unsigned int otp_val, otp_id_reg;
 	unsigned int* otp_mem;
 
-	otp_mem = ExAllocatePool2(
-		POOL_FLAG_NON_PAGED,
+	otp_mem = ExAllocatePoolWithTag(
+		NonPagedPool,
 		sizeof(*otp_mem) * CS35L41_OTP_SIZE_WORDS,
 		CS35L41_POOL_TAG
 	);
@@ -880,15 +880,15 @@ GetDeviceUID(
 		goto Exit;
 	}
 
-	uint32_t uid;
+	unsigned int uid;
 	if (outputBuffer->Argument[0].DataLength >= 4) {
-		uid = *(uint32_t*)outputBuffer->Argument->Data;
+		uid = *(unsigned int*)outputBuffer->Argument->Data;
 	}
 	else if (outputBuffer->Argument[0].DataLength >= 2) {
-		uid = *(uint16_t*)outputBuffer->Argument->Data;
+		uid = *(unsigned short*)outputBuffer->Argument->Data;
 	}
 	else {
-		uid = *(uint8_t*)outputBuffer->Argument->Data;
+		uid = *(unsigned char*)outputBuffer->Argument->Data;
 	}
 	if (PUID) {
 		*PUID = uid;

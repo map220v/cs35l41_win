@@ -15,8 +15,6 @@
 #include <acpiioct.h>
 #include <ntstrsafe.h>
 
-#include <stdint.h>
-
 #include "spb.h"
 
 //
@@ -101,7 +99,7 @@ EVT_WDFDEVICE_WDM_IRP_PREPROCESS Cs35l41EvtWdmPreprocessMnQueryId;
 
 EVT_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL Cs35l41EvtInternalDeviceControl;
 
-NTSTATUS cs35l41_reg_bulk_write(PCS35L41_CONTEXT pDevice, uint32_t reg, uint8_t* data, uint32_t length);
+NTSTATUS cs35l41_reg_bulk_write(PCS35L41_CONTEXT pDevice, unsigned int reg, unsigned char* data, unsigned int length);
 
 //
 // Helper macros
