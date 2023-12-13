@@ -25,9 +25,6 @@
 
 #define CS35L41_POOL_TAG            (ULONG) '5101'
 
-#define true 1
-#define false 0
-
 typedef enum {
 	CSAudioEndpointTypeDSP,
 	CSAudioEndpointTypeSpeaker,
@@ -57,7 +54,7 @@ typedef struct CSAUDIOARG {
 	CSAudioEndpointRequest endpointRequest;
 	union {
 		CsAudioFormatOverride formatOverride;
-	};
+	} UCsAudioFormatOverride;
 } CsAudioArg, * PCsAudioArg;
 
 typedef struct _CS35L41_CONTEXT
@@ -99,7 +96,7 @@ EVT_WDFDEVICE_WDM_IRP_PREPROCESS Cs35l41EvtWdmPreprocessMnQueryId;
 
 EVT_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL Cs35l41EvtInternalDeviceControl;
 
-NTSTATUS cs35l41_reg_bulk_write(PCS35L41_CONTEXT pDevice, unsigned int reg, unsigned char* data, unsigned int length);
+NTSTATUS cs35l41_reg_bulk_write(PCS35L41_CONTEXT pDevice, UINT32 reg, UINT8* data, UINT32 length);
 
 //
 // Helper macros

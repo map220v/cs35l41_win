@@ -1,8 +1,6 @@
 #include "cs35l41.h"
 #include "registers.h"
 
-#define bool int
-
 static ULONG Cs35l41DebugLevel = 100;
 static ULONG Cs35l41DebugCatagories = DBG_INIT || DBG_PNP || DBG_IOCTL;
 
@@ -287,9 +285,9 @@ DriverEntry(
 	return status;
 }
 
-NTSTATUS cs35l41_get_clk_config(int freq)
+NTSTATUS cs35l41_get_clk_config(INT32 freq)
 {
-	int i;
+	INT32 i;
 
 	for (i = 0; i < sizeof(cs35l41_pll_sysclk)/sizeof(pll_sysclk_config); i++) {
 		if (cs35l41_pll_sysclk[i].freq == freq)
@@ -299,9 +297,9 @@ NTSTATUS cs35l41_get_clk_config(int freq)
 	return STATUS_INVALID_PARAMETER;
 }
 
-NTSTATUS cs35l41_reg_write(PCS35L41_CONTEXT pDevice, unsigned int reg, unsigned int data)
+NTSTATUS cs35l41_reg_write(PCS35L41_CONTEXT pDevice, UINT32 reg, UINT32 data)
 {
-	unsigned char buf[8];
+	UINT8 buf[8];
 
 	buf[0] = (reg >> 24) & 0xFF;
 	buf[1] = (reg >> 16) & 0xFF;
@@ -315,9 +313,9 @@ NTSTATUS cs35l41_reg_write(PCS35L41_CONTEXT pDevice, unsigned int reg, unsigned 
 	return SpbWriteDataSynchronously(&pDevice->I2CContext, buf, sizeof(buf));
 }
 
-NTSTATUS cs35l41_reg_bulk_write(PCS35L41_CONTEXT pDevice, unsigned int reg, unsigned char* data, unsigned int length)
+NTSTATUS cs35l41_reg_bulk_write(PCS35L41_CONTEXT pDevice, UINT32 reg, UINT8* data, UINT32 length)
 {
-	unsigned char buf[4];
+	UINT8 buf[4];
 
 	buf[0] = (reg >> 24) & 0xFF;
 	buf[1] = (reg >> 16) & 0xFF;
@@ -329,19 +327,19 @@ NTSTATUS cs35l41_reg_bulk_write(PCS35L41_CONTEXT pDevice, unsigned int reg, unsi
 
 NTSTATUS cs35l41_reg_read(
 	_In_ PCS35L41_CONTEXT pDevice,
-	unsigned int reg,
-	unsigned int* data
+	UINT32 reg,
+	UINT32* data
 ) {
 	NTSTATUS status;
-	unsigned char buf[4];
+	UINT8 buf[4];
 
 	buf[0] = (reg >> 24) & 0xFF;
 	buf[1] = (reg >> 16) & 0xFF;
 	buf[2] = (reg >> 8) & 0xFF;
 	buf[3] = reg & 0xFF;
 
-	unsigned int raw_data = 0;
-	status = SpbWriteRead(&pDevice->I2CContext, &buf, sizeof(unsigned int), &raw_data, sizeof(unsigned int), 0);
+	UINT32 raw_data = 0;
+	status = SpbWriteRead(&pDevice->I2CContext, &buf, sizeof(UINT32), &raw_data, sizeof(UINT32), 0);
 	*data = RtlUlongByteSwap(raw_data);
 
 	return status;
@@ -349,21 +347,21 @@ NTSTATUS cs35l41_reg_read(
 
 NTSTATUS cs35l41_reg_bulk_read(
 	_In_ PCS35L41_CONTEXT pDevice,
-	unsigned int reg,
-	unsigned int* data,
-	unsigned int length
+	UINT32 reg,
+	UINT32* data,
+	UINT32 length
 ) {
 	NTSTATUS status = STATUS_IO_DEVICE_ERROR;
-	unsigned char buf[4];
-	unsigned int raw_data;
+	UINT8 buf[4];
+	UINT32 raw_data;
 
-	for (int i = 0; i < length; i++) {
+	for (UINT32 i = 0; i < length; i++) {
 		buf[0] = (reg >> 24) & 0xFF;
 		buf[1] = (reg >> 16) & 0xFF;
 		buf[2] = (reg >> 8) & 0xFF;
 		buf[3] = reg & 0xFF;
 
-		status = SpbWriteRead(&pDevice->I2CContext, &buf, sizeof(unsigned int), &raw_data, sizeof(unsigned int), 0);
+		status = SpbWriteRead(&pDevice->I2CContext, &buf, sizeof(UINT32), &raw_data, sizeof(UINT32), 0);
 		data[i] = RtlUlongByteSwap(raw_data);
 
 		reg = reg + 4;
@@ -372,10 +370,10 @@ NTSTATUS cs35l41_reg_bulk_read(
 	return status;
 }
 
-NTSTATUS cs35l41_reg_update_bits(PCS35L41_CONTEXT pDevice, unsigned int reg, unsigned int mask, unsigned int val)
+NTSTATUS cs35l41_reg_update_bits(PCS35L41_CONTEXT pDevice, UINT32 reg, UINT32 mask, UINT32 val)
 {
 	NTSTATUS status;
-	unsigned int temp_val, data;
+	UINT32 temp_val, data;
 
 	status = cs35l41_reg_read(pDevice, reg, &data);
 
@@ -396,9 +394,9 @@ NTSTATUS cs35l41_reg_update_bits(PCS35L41_CONTEXT pDevice, unsigned int reg, uns
 	return status;
 }
 
-static const struct cs35l41_otp_map_element_t* cs35l41_find_otp_map(unsigned int otp_id)
+static const struct cs35l41_otp_map_element_t* cs35l41_find_otp_map(UINT32 otp_id)
 {
-	int i;
+	INT32 i;
 
 	for (i = 0; i < ARRAYSIZE(cs35l41_otp_map_map); i++) {
 		if (cs35l41_otp_map_map[i].id == otp_id)
@@ -412,10 +410,10 @@ NTSTATUS cs35l41_otp_unpack(PCS35L41_CONTEXT pDevice)
 {
 	const struct cs35l41_otp_map_element_t* otp_map_match;
 	const struct cs35l41_otp_packed_element_t* otp_map;
-	int bit_offset, word_offset, ret, i;
-	unsigned int bit_sum = 8;
-	unsigned int otp_val, otp_id_reg;
-	unsigned int* otp_mem;
+	INT32 bit_offset, word_offset, ret;
+	UINT32 bit_sum = 8;
+	UINT32 otp_val, otp_id_reg;
+	UINT32* otp_mem;
 
 	otp_mem = ExAllocatePoolWithTag(
 		NonPagedPool,
@@ -453,7 +451,7 @@ NTSTATUS cs35l41_otp_unpack(PCS35L41_CONTEXT pDevice)
 	bit_offset = otp_map_match->bit_offset;
 	word_offset = otp_map_match->word_offset;
 
-	for (i = 0; i < otp_map_match->num_elements; i++) {
+	for (UINT32 i = 0; i < otp_map_match->num_elements; i++) {
 		Cs35l41Print(DEBUG_LEVEL_INFO, DBG_INIT,
 			"bitoffset= %d, word_offset=%d, bit_sum mod 32=%d, otp_map[i].size = %u\n",
 			bit_offset, word_offset, bit_sum % 32, otp_map[i].size);
@@ -502,29 +500,29 @@ exit:
 	return ret;
 }
 
-static const unsigned char cs35l41_bst_k1_table[4][5] = {
+static const UINT8 cs35l41_bst_k1_table[4][5] = {
 	{ 0x24, 0x32, 0x32, 0x4F, 0x57 },
 	{ 0x24, 0x32, 0x32, 0x4F, 0x57 },
 	{ 0x40, 0x32, 0x32, 0x4F, 0x57 },
 	{ 0x40, 0x32, 0x32, 0x4F, 0x57 }
 };
 
-static const unsigned char cs35l41_bst_k2_table[4][5] = {
+static const UINT8 cs35l41_bst_k2_table[4][5] = {
 	{ 0x24, 0x49, 0x66, 0xA3, 0xEA },
 	{ 0x24, 0x49, 0x66, 0xA3, 0xEA },
 	{ 0x48, 0x49, 0x66, 0xA3, 0xEA },
 	{ 0x48, 0x49, 0x66, 0xA3, 0xEA }
 };
 
-static const unsigned char cs35l41_bst_slope_table[4] = {
+static const UINT8 cs35l41_bst_slope_table[4] = {
 	0x75, 0x6B, 0x3B, 0x28
 };
 
-static NTSTATUS cs35l41_boost_config(PCS35L41_CONTEXT pDevice, int boost_ind,
-	int boost_cap, int boost_ipk)
+static NTSTATUS cs35l41_boost_config(PCS35L41_CONTEXT pDevice, INT32 boost_ind,
+	INT32 boost_cap, INT32 boost_ipk)
 {
-	unsigned char bst_lbst_val, bst_cbst_range, bst_ipk_scaled;
-	int ret;
+	UINT8 bst_lbst_val, bst_cbst_range, bst_ipk_scaled;
+	INT32 ret;
 
 	switch (boost_ind) {
 	case 1000:	/* 1.0 uH */
@@ -596,7 +594,7 @@ static NTSTATUS cs35l41_boost_config(PCS35L41_CONTEXT pDevice, int boost_ind,
 		return ret;
 	}
 
-	bst_ipk_scaled = ((boost_ipk - 1600) / 50) + 0x10;
+	bst_ipk_scaled = (UINT8)((boost_ipk - 1600) / 50) + 0x10;
 
 	ret = cs35l41_reg_update_bits(pDevice, CS35L41_BSTCVRT_PEAK_CUR, CS35L41_BST_IPK_MASK,
 		bst_ipk_scaled << CS35L41_BST_IPK_SHIFT);
@@ -615,7 +613,7 @@ static NTSTATUS cs35l41_boost_config(PCS35L41_CONTEXT pDevice, int boost_ind,
 void udelay(ULONG usec) {
 	LARGE_INTEGER Interval;
 	Interval.QuadPart = -10 * (LONGLONG)usec;
-	KeDelayExecutionThread(KernelMode, false, &Interval);
+	KeDelayExecutionThread(KernelMode, FALSE, &Interval);
 }
 
 void msleep(ULONG msec) {
@@ -643,13 +641,13 @@ static NTSTATUS cs35l41_amp_disable(PCS35L41_CONTEXT pDevice)
 	cs35l41_reg_update_bits(pDevice, CS35L41_PWR_CTRL1,
 		CS35L41_GLOBAL_EN_MASK, 0);
 
-	bool pdn = false;
-	unsigned int val, i;
+	BOOLEAN pdn = FALSE;
+	UINT32 val, i;
 	for (i = 0; i < 100; i++) {
 		cs35l41_reg_read(pDevice, CS35L41_IRQ1_STATUS1,
 			&val);
 		if (val & CS35L41_PDN_DONE_MASK) {
-			pdn = true;
+			pdn = TRUE;
 			break;
 		}
 		msleep(1);
@@ -673,11 +671,11 @@ static NTSTATUS cs35l41_amp_disable(PCS35L41_CONTEXT pDevice)
 }
 
 static NTSTATUS cs35l41_component_set_sysclk(PCS35L41_CONTEXT pDevice,
-	int source,
-	unsigned int freq)
+	INT32 source,
+	UINT32 freq)
 {
-	unsigned int fs1_val, fs2_val, val;
-	int extclk_cfg;
+	UINT32 fs1_val = 0, fs2_val = 0, val;
+	INT32 extclk_cfg;
 
 	if (freq > 6000000) {
 		fs1_val = 3 * 4 + 4;
@@ -729,8 +727,8 @@ static NTSTATUS cs35l41_component_set_sysclk(PCS35L41_CONTEXT pDevice,
 
 static NTSTATUS cs35l41_pcm_hw_params(PCS35L41_CONTEXT pDevice)
 {
-	int asp_width = 32;
-	int asp_wl = 16;
+	INT32 asp_width = 32;
+	INT32 asp_wl = 16;
 
 	cs35l41_reg_update_bits(pDevice, CS35L41_GLOBAL_CLK_CTRL,
 		CS35L41_GLOBAL_FS_MASK,
@@ -783,10 +781,10 @@ static NTSTATUS cs35l41_pcm_hw_params(PCS35L41_CONTEXT pDevice)
 
 static NTSTATUS cs35l41_set_dai_fmt(PCS35L41_CONTEXT pDevice)
 {
-	int sclk_fmt = 0; //SND_SOC_DAIFMT_NB_NF
-	int lrclk_fmt = 0; //SND_SOC_DAIFMT_NB_NF
-	int slave_mode = 0; //SND_SOC_DAIFMT_CBS_CFS
-	int asp_fmt = 2; //I2S
+	INT32 sclk_fmt = 0; //SND_SOC_DAIFMT_NB_NF
+	INT32 lrclk_fmt = 0; //SND_SOC_DAIFMT_NB_NF
+	INT32 slave_mode = 0; //SND_SOC_DAIFMT_CBS_CFS
+	INT32 asp_fmt = 2; //I2S
 
 	cs35l41_reg_update_bits(pDevice, CS35L41_SP_FORMAT,
 		CS35L41_ASP_FMT_MASK,
@@ -880,15 +878,15 @@ GetDeviceUID(
 		goto Exit;
 	}
 
-	unsigned int uid;
+	UINT32 uid;
 	if (outputBuffer->Argument[0].DataLength >= 4) {
-		uid = *(unsigned int*)outputBuffer->Argument->Data;
+		uid = *(UINT32*)outputBuffer->Argument->Data;
 	}
 	else if (outputBuffer->Argument[0].DataLength >= 2) {
-		uid = *(unsigned short*)outputBuffer->Argument->Data;
+		uid = *(UINT16*)outputBuffer->Argument->Data;
 	}
 	else {
-		uid = *(unsigned char*)outputBuffer->Argument->Data;
+		uid = *(UINT8*)outputBuffer->Argument->Data;
 	}
 	if (PUID) {
 		*PUID = uid;
@@ -910,7 +908,7 @@ OnInterruptIsr(
 )
 {
 	PCS35L41_CONTEXT pDevice;
-	NTSTATUS ret;
+	BOOLEAN ret;
 
 	UNREFERENCED_PARAMETER(MessageID);
 
@@ -920,9 +918,9 @@ OnInterruptIsr(
 	ret = FALSE;
 	pDevice = GetDeviceContext(WdfInterruptGetDevice(Interrupt));
 
-	unsigned int status[4] = { 0, 0, 0, 0 };
-	unsigned int masks[4] = { 0, 0, 0, 0 };
-	unsigned int i;
+	UINT32 status[4] = { 0, 0, 0, 0 };
+	UINT32 masks[4] = { 0, 0, 0, 0 };
+	UINT32 i;
 
 	for (i = 0; i < sizeof(status) / sizeof(status[0]); i++) {
 		cs35l41_reg_read(pDevice,
@@ -1056,8 +1054,8 @@ StartCodec(
 		return status;
 	}
 
-	unsigned int int_status;
-	int timeout = 100;
+	UINT32 int_status;
+	INT32 timeout = 100;
 	do {
 		if (timeout == 0) {
 			Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_PNP,
@@ -1078,8 +1076,8 @@ StartCodec(
 		return status;
 	}
 
-	int revid = -1;
-	status = cs35l41_reg_read(pDevice, CS35L41_DEVID, &revid);
+	INT32 revid = -1;
+	status = cs35l41_reg_read(pDevice, CS35L41_DEVID, (UINT32*)&revid);
 	if (revid < 0) {
 		Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_PNP,
 			"Failed to read device ID\n");
@@ -1094,7 +1092,7 @@ StartCodec(
 		return status;
 	}
 
-	unsigned int reg_revid = 0;
+	UINT32 reg_revid = 0;
 	status = cs35l41_reg_read(pDevice, CS35L41_REVID, &reg_revid);
 	if (!NT_SUCCESS(status)) {
 		return status;
@@ -1131,18 +1129,18 @@ StartCodec(
 	struct cs35l41_gpio_cfg gpio1;
 	struct cs35l41_gpio_cfg gpio2;
 
-	gpio1.pol_inv = false;
-	gpio1.out_en = false;
+	gpio1.pol_inv = FALSE;
+	gpio1.out_en = FALSE;
 	gpio1.func = 0;
-	gpio1.valid = false;
+	gpio1.valid = FALSE;
 
-	gpio2.pol_inv = false;
-	gpio2.out_en = true;
+	gpio2.pol_inv = FALSE;
+	gpio2.out_en = TRUE;
 	//GpioInt in ACPI should be:
 	//ActiveLow == func 2 or 4
 	//ActiveHigh == func 5
 	gpio2.func = 4;
-	gpio2.valid = true;
+	gpio2.valid = TRUE;
 	//E1000001 downstream
 	cs35l41_reg_update_bits(pDevice, CS35L41_GPIO1_CTRL1,
 		CS35L41_GPIO_POL_MASK | CS35L41_GPIO_DIR_MASK,
@@ -1175,17 +1173,17 @@ StartCodec(
 	}
 
 	//cirrus,boost-peak-milliamp
-	int bst_ipk = 4000;
+	INT32 bst_ipk = 4000;
 	//cirrus,boost-ind-nanohenry
-	int bst_ind = 1000;
+	INT32 bst_ind = 1000;
 	//cirrus,boost-cap-microfarad
-	int bst_cap = 15;
+	INT32 bst_cap = 15;
 
 	/* Required */
 	cs35l41_boost_config(pDevice, bst_ind, bst_cap, bst_ipk);
 
 	//cirrus,asp-sdout-hiz
-	int dout_hiz = 3;
+	INT32 dout_hiz = 3;
 
 	/* Optional */
 	if (dout_hiz <= CS35L41_ASP_DOUT_HIZ_MASK && dout_hiz >= 0)
@@ -1239,7 +1237,7 @@ StopCodec(
 	return status;
 }
 
-int CsAudioArg2 = 1;
+INT32 CsAudioArg2 = 1;
 
 VOID
 CSAudioRegisterEndpoint(
