@@ -25,38 +25,6 @@
 
 #define CS35L41_POOL_TAG            (ULONG) '5101'
 
-typedef enum {
-	CSAudioEndpointTypeDSP,
-	CSAudioEndpointTypeSpeaker,
-	CSAudioEndpointTypeHeadphone,
-	CSAudioEndpointTypeMicArray,
-	CSAudioEndpointTypeMicJack
-} CSAudioEndpointType;
-
-typedef enum {
-	CSAudioEndpointRegister,
-	CSAudioEndpointStart,
-	CSAudioEndpointStop,
-	CSAudioEndpointOverrideFormat
-} CSAudioEndpointRequest;
-
-typedef struct CSAUDIOFORMATOVERRIDE {
-	UINT16 channels;
-	UINT16 frequency;
-	UINT16 bitsPerSample;
-	UINT16 validBitsPerSample;
-	BOOLEAN force32BitOutputContainer;
-} CsAudioFormatOverride;
-
-typedef struct CSAUDIOARG {
-	UINT32 argSz;
-	CSAudioEndpointType endpointType;
-	CSAudioEndpointRequest endpointRequest;
-	union {
-		CsAudioFormatOverride formatOverride;
-	} UCsAudioFormatOverride;
-} CsAudioArg, * PCsAudioArg;
-
 typedef struct _CS35L41_CONTEXT
 {
 
@@ -64,19 +32,12 @@ typedef struct _CS35L41_CONTEXT
 
 	WDFINTERRUPT InterruptObject;
 
-	WDFQUEUE ReportQueue;
-
 	SPB_CONTEXT I2CContext;
 
 	BOOLEAN SetUID;
 	INT32 UID;
 
 	BOOLEAN DevicePoweredOn;
-
-	PCALLBACK_OBJECT CSAudioAPICallback;
-	PVOID CSAudioAPICallbackObj;
-
-	BOOLEAN CSAudioManaged;
 
 } CS35L41_CONTEXT, *PCS35L41_CONTEXT;
 
@@ -91,10 +52,6 @@ DRIVER_INITIALIZE DriverEntry;
 EVT_WDF_DRIVER_UNLOAD Cs35l41DriverUnload;
 
 EVT_WDF_DRIVER_DEVICE_ADD Cs35l41EvtDeviceAdd;
-
-EVT_WDFDEVICE_WDM_IRP_PREPROCESS Cs35l41EvtWdmPreprocessMnQueryId;
-
-EVT_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL Cs35l41EvtInternalDeviceControl;
 
 NTSTATUS cs35l41_reg_bulk_write(PCS35L41_CONTEXT pDevice, UINT32 reg, UINT8* data, UINT32 length);
 
@@ -115,8 +72,7 @@ NTSTATUS cs35l41_reg_bulk_write(PCS35L41_CONTEXT pDevice, UINT32 reg, UINT8* dat
     if (Cs35l41DebugLevel >= dbglevel &&                         \
         (Cs35l41DebugCatagories && dbgcatagory))                 \
 	    {                                                           \
-        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, DRIVERNAME);                                   \
-		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, fmt, __VA_ARGS__);                             \
+		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, DRIVERNAME fmt, __VA_ARGS__);                             \
 	    }                                                           \
 }
 #else

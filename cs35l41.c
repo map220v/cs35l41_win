@@ -1237,55 +1237,6 @@ StopCodec(
 	return status;
 }
 
-INT32 CsAudioArg2 = 1;
-
-VOID
-CSAudioRegisterEndpoint(
-	PCS35L41_CONTEXT pDevice
-) {
-	CsAudioArg arg;
-	RtlZeroMemory(&arg, sizeof(CsAudioArg));
-	arg.argSz = sizeof(CsAudioArg);
-	arg.endpointType = CSAudioEndpointTypeSpeaker;
-	arg.endpointRequest = CSAudioEndpointRegister;
-	ExNotifyCallback(pDevice->CSAudioAPICallback, &arg, &CsAudioArg2);
-}
-
-VOID
-CsAudioCallbackFunction(
-	IN PCS35L41_CONTEXT pDevice,
-	CsAudioArg* arg,
-	PVOID Argument2
-) {
-	if (!pDevice) {
-		return;
-	}
-
-	if (Argument2 == &CsAudioArg2) {
-		return;
-	}
-
-	pDevice->CSAudioManaged = TRUE;
-
-	CsAudioArg localArg;
-	RtlZeroMemory(&localArg, sizeof(CsAudioArg));
-	RtlCopyMemory(&localArg, arg, min(arg->argSz, sizeof(CsAudioArg)));
-
-	if (localArg.endpointType == CSAudioEndpointTypeDSP && localArg.endpointRequest == CSAudioEndpointRegister) {
-		CSAudioRegisterEndpoint(pDevice);
-	}
-	else if (localArg.endpointType != CSAudioEndpointTypeSpeaker) {
-		return;
-	}
-
-	if (localArg.endpointRequest == CSAudioEndpointStop) {
-		StopCodec(pDevice);
-	}
-	if (localArg.endpointRequest == CSAudioEndpointStart) {
-		StartCodec(pDevice);
-	}
-}
-
 NTSTATUS
 OnPrepareHardware(
 	_In_  WDFDEVICE     FxDevice,
@@ -1417,57 +1368,6 @@ Status
 
 	SpbTargetDeinitialize(FxDevice, &pDevice->I2CContext);
 
-	if (pDevice->CSAudioAPICallbackObj) {
-		ExUnregisterCallback(pDevice->CSAudioAPICallbackObj);
-		pDevice->CSAudioAPICallbackObj = NULL;
-	}
-
-	if (pDevice->CSAudioAPICallback) {
-		ObfDereferenceObject(pDevice->CSAudioAPICallback);
-		pDevice->CSAudioAPICallback = NULL;
-	}
-
-	return status;
-}
-
-NTSTATUS
-OnSelfManagedIoInit(
-	_In_
-	WDFDEVICE FxDevice
-) {
-	PCS35L41_CONTEXT pDevice = GetDeviceContext(FxDevice);
-	NTSTATUS status = STATUS_SUCCESS;
-
-	// CS Audio Callback
-
-	UNICODE_STRING CSAudioCallbackAPI;
-	RtlInitUnicodeString(&CSAudioCallbackAPI, L"\\CallBack\\CsAudioCallbackAPI");
-
-
-	OBJECT_ATTRIBUTES attributes;
-	InitializeObjectAttributes(&attributes,
-		&CSAudioCallbackAPI,
-		OBJ_KERNEL_HANDLE | OBJ_OPENIF | OBJ_CASE_INSENSITIVE | OBJ_PERMANENT,
-		NULL,
-		NULL
-	);
-	status = ExCreateCallback(&pDevice->CSAudioAPICallback, &attributes, TRUE, TRUE);
-	if (!NT_SUCCESS(status)) {
-
-		return status;
-	}
-
-	pDevice->CSAudioAPICallbackObj = ExRegisterCallback(pDevice->CSAudioAPICallback,
-		CsAudioCallbackFunction,
-		pDevice
-	);
-	if (!pDevice->CSAudioAPICallbackObj) {
-
-		return STATUS_NO_CALLBACK_ACTIVE;
-	}
-
-	CSAudioRegisterEndpoint(pDevice);
-
 	return status;
 }
 
@@ -1542,12 +1442,10 @@ Cs35l41EvtDeviceAdd(
 )
 {
 	NTSTATUS                      status = STATUS_SUCCESS;
-	WDF_IO_QUEUE_CONFIG           queueConfig;
 	WDF_INTERRUPT_CONFIG          interruptConfig;
 	WDF_OBJECT_ATTRIBUTES         attributes;
 	WDFDEVICE                     device;
-	WDFQUEUE                      queue;
-	PCS35L41_CONTEXT               devContext;
+	PCS35L41_CONTEXT              devContext;
 
 	UNREFERENCED_PARAMETER(Driver);
 
@@ -1562,7 +1460,6 @@ Cs35l41EvtDeviceAdd(
 
 		pnpCallbacks.EvtDevicePrepareHardware = OnPrepareHardware;
 		pnpCallbacks.EvtDeviceReleaseHardware = OnReleaseHardware;
-		pnpCallbacks.EvtDeviceSelfManagedIoInit = OnSelfManagedIoInit;
 		pnpCallbacks.EvtDeviceD0Entry = OnD0Entry;
 		pnpCallbacks.EvtDeviceD0Exit = OnD0Exit;
 
@@ -1591,57 +1488,8 @@ Cs35l41EvtDeviceAdd(
 		return status;
 	}
 
-	{
-		WDF_DEVICE_STATE deviceState;
-		WDF_DEVICE_STATE_INIT(&deviceState);
-
-		deviceState.NotDisableable = WdfFalse;
-		WdfDeviceSetDeviceState(device, &deviceState);
-	}
-
-	WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&queueConfig, WdfIoQueueDispatchParallel);
-
-	queueConfig.EvtIoInternalDeviceControl = Cs35l41EvtInternalDeviceControl;
-
-	status = WdfIoQueueCreate(device,
-		&queueConfig,
-		WDF_NO_OBJECT_ATTRIBUTES,
-		&queue
-	);
-
-	if (!NT_SUCCESS(status))
-	{
-		Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_PNP,
-			"WdfIoQueueCreate failed 0x%x\n", status);
-
-		return status;
-	}
-
-	//
-	// Create manual I/O queue to take care of hid report read requests
-	//
-
 	devContext = GetDeviceContext(device);
-
 	devContext->FxDevice = device;
-
-	WDF_IO_QUEUE_CONFIG_INIT(&queueConfig, WdfIoQueueDispatchManual);
-
-	queueConfig.PowerManaged = WdfFalse;
-
-	status = WdfIoQueueCreate(device,
-		&queueConfig,
-		WDF_NO_OBJECT_ATTRIBUTES,
-		&devContext->ReportQueue
-	);
-
-	if (!NT_SUCCESS(status))
-	{
-		Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_PNP,
-			"WdfIoQueueCreate failed 0x%x\n", status);
-
-		return status;
-	}
 
 	//
 	// Create an interrupt object for hardware notifications
@@ -1659,35 +1507,4 @@ Cs35l41EvtDeviceAdd(
 		&devContext->InterruptObject);
 
 	return status;
-}
-
-VOID
-Cs35l41EvtInternalDeviceControl(
-	IN WDFQUEUE     Queue,
-	IN WDFREQUEST   Request,
-	IN size_t       OutputBufferLength,
-	IN size_t       InputBufferLength,
-	IN ULONG        IoControlCode
-)
-{
-	NTSTATUS            status = STATUS_SUCCESS;
-	WDFDEVICE           device;
-	PCS35L41_CONTEXT     devContext;
-
-	UNREFERENCED_PARAMETER(OutputBufferLength);
-	UNREFERENCED_PARAMETER(InputBufferLength);
-
-	device = WdfIoQueueGetDevice(Queue);
-	devContext = GetDeviceContext(device);
-
-	switch (IoControlCode)
-	{
-	default:
-		status = STATUS_NOT_SUPPORTED;
-		break;
-	}
-
-	WdfRequestComplete(Request, status);
-
-	return;
 }
