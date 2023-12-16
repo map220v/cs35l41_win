@@ -1,5 +1,5 @@
 #include "cs35l41.h"
-#include "registers.h"
+#include "cs35l41_dsp.h"
 
 static ULONG Cs35l41DebugLevel = 100;
 static ULONG Cs35l41DebugCatagories = DBG_INIT || DBG_PNP || DBG_IOCTL;
@@ -248,6 +248,24 @@ static const struct cs35l41_otp_map_element_t cs35l41_otp_map_map[] = {
 	},
 };
 
+static const UINT8 cs35l41_bst_k1_table[4][5] = {
+	{ 0x24, 0x32, 0x32, 0x4F, 0x57 },
+	{ 0x24, 0x32, 0x32, 0x4F, 0x57 },
+	{ 0x40, 0x32, 0x32, 0x4F, 0x57 },
+	{ 0x40, 0x32, 0x32, 0x4F, 0x57 }
+};
+
+static const UINT8 cs35l41_bst_k2_table[4][5] = {
+	{ 0x24, 0x49, 0x66, 0xA3, 0xEA },
+	{ 0x24, 0x49, 0x66, 0xA3, 0xEA },
+	{ 0x48, 0x49, 0x66, 0xA3, 0xEA },
+	{ 0x48, 0x49, 0x66, 0xA3, 0xEA }
+};
+
+static const UINT8 cs35l41_bst_slope_table[4] = {
+	0x75, 0x6B, 0x3B, 0x28
+};
+
 NTSTATUS
 DriverEntry(
 	__in PDRIVER_OBJECT  DriverObject,
@@ -289,7 +307,7 @@ NTSTATUS cs35l41_get_clk_config(INT32 freq)
 {
 	INT32 i;
 
-	for (i = 0; i < sizeof(cs35l41_pll_sysclk)/sizeof(pll_sysclk_config); i++) {
+	for (i = 0; i < ARRAY_SIZE(cs35l41_pll_sysclk); i++) {
 		if (cs35l41_pll_sysclk[i].freq == freq)
 			return cs35l41_pll_sysclk[i].clk_cfg;
 	}
@@ -299,30 +317,31 @@ NTSTATUS cs35l41_get_clk_config(INT32 freq)
 
 NTSTATUS cs35l41_reg_write(PCS35L41_CONTEXT pDevice, UINT32 reg, UINT32 data)
 {
-	UINT8 buf[8];
+	UINT32 buf[2];
 
-	buf[0] = (reg >> 24) & 0xFF;
-	buf[1] = (reg >> 16) & 0xFF;
-	buf[2] = (reg >> 8) & 0xFF;
-	buf[3] = reg & 0xFF;
-	buf[4] = (data >> 24) & 0xFF;
-	buf[5] = (data >> 16) & 0xFF;
-	buf[6] = (data >> 8) & 0xFF;
-	buf[7] = data & 0xFF;
+	buf[0] = _byteswap_ulong(reg);
+	buf[1] = _byteswap_ulong(data);
 
 	return SpbWriteDataSynchronously(&pDevice->I2CContext, buf, sizeof(buf));
 }
 
+NTSTATUS cs35l41_multi_reg_write(PCS35L41_CONTEXT pDevice, const struct reg_sequence *regs, UINT32 num_regs)
+{
+	NTSTATUS status = STATUS_SUCCESS;
+
+	for (UINT32 i = 0; i < num_regs; i++) {
+		status = cs35l41_reg_write(pDevice, regs[i].reg, regs[i].def);
+		if (!NT_SUCCESS(status))
+			return status;
+	}
+	return status;
+}
+
 NTSTATUS cs35l41_reg_bulk_write(PCS35L41_CONTEXT pDevice, UINT32 reg, UINT8* data, UINT32 length)
 {
-	UINT8 buf[4];
+	UINT32 regBE = _byteswap_ulong(reg);
 
-	buf[0] = (reg >> 24) & 0xFF;
-	buf[1] = (reg >> 16) & 0xFF;
-	buf[2] = (reg >> 8) & 0xFF;
-	buf[3] = reg & 0xFF;
-
-	return SpbWriteDataSynchronouslyEx(&pDevice->I2CContext, buf, sizeof(buf), data, length);
+	return SpbWriteDataSynchronouslyEx(&pDevice->I2CContext, &regBE, sizeof(UINT32), data, length);
 }
 
 NTSTATUS cs35l41_reg_read(
@@ -331,16 +350,11 @@ NTSTATUS cs35l41_reg_read(
 	UINT32* data
 ) {
 	NTSTATUS status;
-	UINT8 buf[4];
-
-	buf[0] = (reg >> 24) & 0xFF;
-	buf[1] = (reg >> 16) & 0xFF;
-	buf[2] = (reg >> 8) & 0xFF;
-	buf[3] = reg & 0xFF;
+	UINT32 regBE = _byteswap_ulong(reg);
 
 	UINT32 raw_data = 0;
-	status = SpbWriteRead(&pDevice->I2CContext, &buf, sizeof(UINT32), &raw_data, sizeof(UINT32), 0);
-	*data = RtlUlongByteSwap(raw_data);
+	status = SpbWriteRead(&pDevice->I2CContext, &regBE, sizeof(UINT32), &raw_data, sizeof(UINT32), 0);
+	*data = _byteswap_ulong(raw_data);
 
 	return status;
 }
@@ -352,21 +366,10 @@ NTSTATUS cs35l41_reg_bulk_read(
 	UINT32 length
 ) {
 	NTSTATUS status = STATUS_IO_DEVICE_ERROR;
-	UINT8 buf[4];
-	UINT32 raw_data;
+	UINT32 regBE = _byteswap_ulong(reg);
 
-	for (UINT32 i = 0; i < length; i++) {
-		buf[0] = (reg >> 24) & 0xFF;
-		buf[1] = (reg >> 16) & 0xFF;
-		buf[2] = (reg >> 8) & 0xFF;
-		buf[3] = reg & 0xFF;
-
-		status = SpbWriteRead(&pDevice->I2CContext, &buf, sizeof(UINT32), &raw_data, sizeof(UINT32), 0);
-		data[i] = RtlUlongByteSwap(raw_data);
-
-		reg = reg + 4;
-	}
-
+	status = SpbWriteRead(&pDevice->I2CContext, &regBE, sizeof(UINT32), data, (UINT16)length, 0);
+	
 	return status;
 }
 
@@ -499,24 +502,6 @@ exit:
 
 	return ret;
 }
-
-static const UINT8 cs35l41_bst_k1_table[4][5] = {
-	{ 0x24, 0x32, 0x32, 0x4F, 0x57 },
-	{ 0x24, 0x32, 0x32, 0x4F, 0x57 },
-	{ 0x40, 0x32, 0x32, 0x4F, 0x57 },
-	{ 0x40, 0x32, 0x32, 0x4F, 0x57 }
-};
-
-static const UINT8 cs35l41_bst_k2_table[4][5] = {
-	{ 0x24, 0x49, 0x66, 0xA3, 0xEA },
-	{ 0x24, 0x49, 0x66, 0xA3, 0xEA },
-	{ 0x48, 0x49, 0x66, 0xA3, 0xEA },
-	{ 0x48, 0x49, 0x66, 0xA3, 0xEA }
-};
-
-static const UINT8 cs35l41_bst_slope_table[4] = {
-	0x75, 0x6B, 0x3B, 0x28
-};
 
 static NTSTATUS cs35l41_boost_config(PCS35L41_CONTEXT pDevice, INT32 boost_ind,
 	INT32 boost_cap, INT32 boost_ipk)
@@ -811,6 +796,83 @@ static NTSTATUS cs35l41_set_dai_fmt(PCS35L41_CONTEXT pDevice)
 	return STATUS_SUCCESS;
 }
 
+static BOOLEAN cs35l41_check_cspl_mbox_sts(enum cs35l41_cspl_mbox_cmd cmd,
+	enum cs35l41_cspl_mbox_status sts)
+{
+	switch (cmd) {
+	case CSPL_MBOX_CMD_NONE:
+	case CSPL_MBOX_CMD_UNKNOWN_CMD:
+		return TRUE;
+	case CSPL_MBOX_CMD_PAUSE:
+	case CSPL_MBOX_CMD_OUT_OF_HIBERNATE:
+		return (sts == CSPL_MBOX_STS_PAUSED);
+	case CSPL_MBOX_CMD_RESUME:
+		return (sts == CSPL_MBOX_STS_RUNNING);
+	case CSPL_MBOX_CMD_REINIT:
+		return (sts == CSPL_MBOX_STS_RUNNING);
+	case CSPL_MBOX_CMD_STOP_PRE_REINIT:
+		return (sts == CSPL_MBOX_STS_RDY_FOR_REINIT);
+	default:
+		return FALSE;
+	}
+}
+
+NTSTATUS cs35l41_set_cspl_mbox_cmd(PCS35L41_CONTEXT pDevice, enum cs35l41_cspl_mbox_cmd cmd)
+{
+	UINT32 sts = 0, i;
+	NTSTATUS status;
+
+	// Set mailbox cmd
+	status = cs35l41_reg_write(pDevice, CS35L41_DSP_VIRT1_MBOX_1, cmd);
+	if (!NT_SUCCESS(status)) {
+		if (cmd != CSPL_MBOX_CMD_OUT_OF_HIBERNATE) {
+			Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_INIT, "Failed to write MBOX: %d\n", status);
+		}
+		return status;
+	}
+
+	// Read mailbox status and verify it is appropriate for the given cmd
+	for (i = 0; i < 5; i++) {
+		udelay(1000);
+
+		status = cs35l41_reg_read(pDevice, CS35L41_DSP_MBOX_2, &sts);
+		if (!NT_SUCCESS(status)) {
+			Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_INIT, "Failed to read MBOX STS: %d\n", status);
+			continue;
+		}
+
+		if (!cs35l41_check_cspl_mbox_sts(cmd, sts)) {
+			Cs35l41Print(DEBUG_LEVEL_VERBOSE, DBG_INIT, "[%u] cmd %u returned invalid sts %u\n", i, cmd, sts);
+		}
+		else
+			return STATUS_SUCCESS;
+	}
+
+	if (cmd != CSPL_MBOX_CMD_OUT_OF_HIBERNATE)
+		Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_INIT, "Failed to set mailbox cmd %u (status %u)\n", cmd, sts);
+
+	return STATUS_UNSUCCESSFUL;
+}
+
+static NTSTATUS cs35l41_dsp_mbox_start(PCS35L41_CONTEXT pDevice)
+{
+	UINT32 fw_status;
+
+	cs35l41_reg_read(pDevice, CS35L41_DSP_MBOX_2, &fw_status);
+
+	switch (fw_status) {
+	case CSPL_MBOX_STS_RUNNING:
+	case CSPL_MBOX_STS_PAUSED:
+		break;
+	default:
+		Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_INIT, "Firmware status is invalid: %u\n",
+			fw_status);
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	return cs35l41_set_cspl_mbox_cmd(pDevice, CSPL_MBOX_CMD_RESUME);
+}
+
 NTSTATUS
 GetDeviceUID(
 	_In_ WDFDEVICE FxDevice,
@@ -913,7 +975,7 @@ OnInterruptIsr(
 	UNREFERENCED_PARAMETER(MessageID);
 
 	Cs35l41Print(DEBUG_LEVEL_VERBOSE, DBG_IOCTL,
-		"OnInterruptIsr - Entry");
+		"OnInterruptIsr - Entry\n");
 
 	ret = FALSE;
 	pDevice = GetDeviceContext(WdfInterruptGetDevice(Interrupt));
@@ -922,7 +984,7 @@ OnInterruptIsr(
 	UINT32 masks[4] = { 0, 0, 0, 0 };
 	UINT32 i;
 
-	for (i = 0; i < sizeof(status) / sizeof(status[0]); i++) {
+	for (i = 0; i < ARRAY_SIZE(status); i++) {
 		cs35l41_reg_read(pDevice,
 			CS35L41_IRQ1_STATUS1 + (i * CS35L41_REGSTRIDE),
 			&status[i]);
@@ -1163,14 +1225,19 @@ StartCodec(
 
 	cs35l41_reg_write(pDevice, CS35L41_IRQ1_MASK1, CS35L41_INT1_MASK_DEFAULT);
 
+	//Load DSP firmware
+	status = cs35l41_dsp_init(pDevice);
 	if (!NT_SUCCESS(status))
-	{
-		Cs35l41Print(DEBUG_LEVEL_ERROR, DBG_INIT,
-			"Error creating WDF interrupt object - 0x%08lX",
-			status);
-
 		return status;
-	}
+
+	status = cs35l41_dsp_run(pDevice);
+	if (!NT_SUCCESS(status))
+		return status;
+
+	//DSP1 on
+	status = cs35l41_dsp_mbox_start(pDevice);
+	if (!NT_SUCCESS(status))
+		return status;
 
 	//cirrus,boost-peak-milliamp
 	INT32 bst_ipk = 4000;
@@ -1199,20 +1266,14 @@ StartCodec(
 
 	cs35l41_reg_write(pDevice, CS35L41_SP_ENABLES, 0x00030001);
 
-	cs35l41_reg_write(pDevice, CS35L41_DAC_PCM1_SRC, CS35L41_INPUT_SRC_ASPRX1);
-	/*
-	cs35l41_reg_write(pDevice, CS35L41_ASP_TX1_SRC, 0x00000032); // ASPTX1 SRC = DSPTX1
-	cs35l41_reg_write(pDevice, CS35L41_ASP_TX2_SRC, 0x00000000); // ASPTX2 SRC = Zero
-	cs35l41_reg_write(pDevice, CS35L41_ASP_TX3_SRC, 0x00000020); // ASPTX3 SRC = ???
-	cs35l41_reg_write(pDevice, CS35L41_ASP_TX4_SRC, 0x00000021); // ASPTX4 SRC = CLASSH
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX1_SRC, 0x00000008); // DSP1RX1 SRC = ASPRX1
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX2_SRC, 0x00000009); // DSP1RX2 SRC = ASPRX2
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX3_SRC, 0x00000018); // DSP1RX3 SRC = VMON
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX4_SRC, 0x00000019); // DSP1RX4 SRC = IMON
-	cs35l41_reg_write(pDevice, CS35L41_DSP1_RX5_SRC, 0x00000020); // DSP1RX5 SRC = ERRVOL
-	*/
-	//cs35l41_reg_write(pDevice, CS35L41_AMP_GAIN_CTRL, 0x00000253);
-	cs35l41_reg_write(pDevice, CS35L41_AMP_GAIN_CTRL, 0x00000153);
+	cs35l41_reg_write(pDevice, CS35L41_DAC_PCM1_SRC, CS35L41_INPUT_DSP_TX1);
+
+	cs35l41_reg_write(pDevice, CS35L41_ASP_TX1_SRC, CS35L41_INPUT_DSP_TX1);
+	cs35l41_reg_write(pDevice, CS35L41_ASP_TX2_SRC, 0x00000000);
+	cs35l41_reg_write(pDevice, CS35L41_ASP_TX3_SRC, 0x00000000);
+	cs35l41_reg_write(pDevice, CS35L41_ASP_TX4_SRC, 0x00000000);
+
+	cs35l41_reg_write(pDevice, CS35L41_AMP_GAIN_CTRL, 0x00000253);
 
 	cs35l41_reg_write(pDevice, CS35L41_PWR_CTRL2, 0x00003721);
 
@@ -1232,6 +1293,15 @@ StopCodec(
 	NTSTATUS status = STATUS_SUCCESS;
 
 	status = cs35l41_amp_disable(pDevice);
+
+	cs35l41_set_cspl_mbox_cmd(pDevice, CSPL_MBOX_CMD_PAUSE);
+
+	pDevice->dsp.fw_id = 0;
+	pDevice->dsp.fw_id_version = 0;
+
+	//pDevice->dsp.booted = FALSE;
+
+	ExFreePoolWithTag(pDevice->dsp.alg_regions, CS35L41_POOL_TAG);
 
 	pDevice->DevicePoweredOn = FALSE;
 	return status;

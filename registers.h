@@ -876,6 +876,24 @@ static const struct cs35l41_pll_sysclk_config cs35l41_pll_sysclk[] = {
 	{ 27000000,	0x3F },
 };
 
+enum cs35l41_cspl_mbox_status {
+	CSPL_MBOX_STS_RUNNING = 0,
+	CSPL_MBOX_STS_PAUSED = 1,
+	CSPL_MBOX_STS_RDY_FOR_REINIT = 2,
+};
+
+enum cs35l41_cspl_mbox_cmd {
+	CSPL_MBOX_CMD_NONE = 0,
+	CSPL_MBOX_CMD_PAUSE = 1,
+	CSPL_MBOX_CMD_RESUME = 2,
+	CSPL_MBOX_CMD_REINIT = 3,
+	CSPL_MBOX_CMD_STOP_PRE_REINIT = 4,
+	CSPL_MBOX_CMD_HIBERNATE = 5,
+	CSPL_MBOX_CMD_OUT_OF_HIBERNATE = 6,
+	CSPL_MBOX_CMD_UNKNOWN_CMD = -1,
+	CSPL_MBOX_CMD_INVALID_SEQUENCE = -2,
+};
+
 //Copy pasted linux GENMASK
 
 #define __AC(X,Y)	(X##Y)
@@ -892,5 +910,7 @@ static const struct cs35l41_pll_sysclk_config cs35l41_pll_sysclk[] = {
 	(((~UL(0)) - (UL(1) << (l)) + 1) & \
 	 (~UL(0) >> (BITS_PER_LONG - 1 - (h))))
 #define GENMASK(h, l) __GENMASK(h, l)
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 #endif /* __CS35L41_H__ */

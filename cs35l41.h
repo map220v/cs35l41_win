@@ -16,6 +16,7 @@
 #include <ntstrsafe.h>
 
 #include "spb.h"
+#include "registers.h"
 
 //
 // String definitions
@@ -24,6 +25,31 @@
 #define DRIVERNAME                 "cs35l41.sys: "
 
 #define CS35L41_POOL_TAG            (ULONG) '5101'
+
+
+struct reg_sequence {
+	UINT32 reg;
+	UINT32 def;
+};
+
+struct cs_dsp_alg_region {
+	UINT32 alg;
+	UINT32 ver;
+	INT32 type;
+	UINT32 base;
+};
+
+struct cs_dsp {
+	struct cs_dsp_alg_region *alg_regions;
+	UINT32 alg_regions_size;
+
+	UINT32 fw_id;
+	UINT32 fw_id_version;
+	UINT32 fw_vendor_id;
+
+	BOOLEAN booted;
+	BOOLEAN running;
+};
 
 typedef struct _CS35L41_CONTEXT
 {
@@ -36,6 +62,8 @@ typedef struct _CS35L41_CONTEXT
 
 	BOOLEAN SetUID;
 	INT32 UID;
+
+	struct cs_dsp dsp;
 
 	BOOLEAN DevicePoweredOn;
 
@@ -53,8 +81,14 @@ EVT_WDF_DRIVER_UNLOAD Cs35l41DriverUnload;
 
 EVT_WDF_DRIVER_DEVICE_ADD Cs35l41EvtDeviceAdd;
 
-NTSTATUS cs35l41_reg_bulk_write(PCS35L41_CONTEXT pDevice, UINT32 reg, UINT8* data, UINT32 length);
+void udelay(ULONG usec);
 
+NTSTATUS cs35l41_reg_write(PCS35L41_CONTEXT pDevice, UINT32 reg, UINT32 data);
+NTSTATUS cs35l41_reg_update_bits(PCS35L41_CONTEXT pDevice, UINT32 reg, UINT32 mask, UINT32 val);
+NTSTATUS cs35l41_multi_reg_write(PCS35L41_CONTEXT pDevice, const struct reg_sequence *regs, UINT32 num_regs);
+NTSTATUS cs35l41_reg_bulk_write(PCS35L41_CONTEXT pDevice, UINT32 reg, UINT8* data, UINT32 length);
+NTSTATUS cs35l41_reg_read(_In_ PCS35L41_CONTEXT pDevice, UINT32 reg, UINT32* data);
+NTSTATUS cs35l41_reg_bulk_read(_In_ PCS35L41_CONTEXT pDevice, UINT32 reg, UINT32* data, UINT32 length);
 //
 // Helper macros
 //

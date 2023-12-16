@@ -139,13 +139,32 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cs35l41.c" />
+    <ClCompile Include="cs35l41_dsp.c" />
     <ClCompile Include="spb.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cs35l41.h" />
+    <ClInclude Include="cs35l41_dsp.h" />
     <ClInclude Include="registers.h" />
     <ClInclude Include="spb.h" />
     <ClInclude Include="trace.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="firmware\cs35l41-dsp1-spk-prot.wmfw">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="firmware\BL-cs35l41-dsp1-spk-prot.bin">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="firmware\BR-cs35l41-dsp1-spk-prot.bin">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="firmware\TL-cs35l41-dsp1-spk-prot.bin">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="firmware\TR-cs35l41-dsp1-spk-prot.bin">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
