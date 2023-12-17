@@ -1047,6 +1047,75 @@ static VOID cs_dsp_halo_stop_core(PCS35L41_CONTEXT pDevice)
 			   HALO_CORE_SOFT_RESET_MASK, 1);
 }
 
+#pragma warning(disable:4047)
+#pragma warning(disable:4024)
+NTSTATUS cs35l41_dsp_configure(PCS35L41_CONTEXT pDevice)
+{
+	NTSTATUS status = STATUS_SUCCESS;
+
+	UINT32 st_ctl = 0;
+	BOOLEAN fw_running = FALSE;
+
+	INT32 settingsBR[] = { 40,4,768,1236,0,0,0,9,8,0,37,0,51,4984939,0,55,134974,56,189791,122,-8303914,8220424,8334092,-8334110,8334080,123,-8363346,8338690,8334092,-8344396,8354905,124,-8382595,8377037,8334092,-8323616,8313344,136,189751,1635995354 };
+	INT32 settingsTR[] = { 31,4,768,1236,0,0,0,5,8,0,37,0,122,-8303914,8220424,8334092,-8334110,8334080,123,-8363346,8338690,8334092,-8344396,8354905,124,-8382595,8377037,8334092,-8323616,8313344,493339961 };
+	INT32 settingsBL[] = { 40,4,768,1236,0,0,0,9,8,0,37,0,51,4984939,0,55,141033,56,194648,122,-8303914,8220424,8334092,-8334110,8334080,123,-8363346,8338690,8334092,-8344396,8354905,124,-8382595,8377037,8334092,-8323616,8313344,136,194596,-26013209 };
+	INT32 settingsTL[] = { 31,4,768,1236,0,0,0,5,8,0,37,0,122,-8303914,8220424,8334092,-8334110,8334080,123,-8363346,8338690,8334092,-8344396,8354905,124,-8382595,8377037,8334092,-8323616,8313344,493339961 };
+
+	/* In Halo DSP, values are 24-bit */
+	cs35l41_reg_write(pDevice, CAL_AMBIENT, 30);
+	
+	switch (pDevice->UID) {
+        case 0: //BOTTOM RIGHT
+            cs35l41_reg_write(pDevice, CAL_R, 9883);
+			cs35l41_reg_write(pDevice, CAL_CHECKSUM, 9884);
+			cs35l41_reg_bulk_write(pDevice, CSPL_UPDATE_PARAMS_CONFIG, &settingsBR, sizeof(settingsBR));
+            break;
+        case 1: //TOP RIGHT
+            cs35l41_reg_write(pDevice, CAL_R, 9546);
+			cs35l41_reg_write(pDevice, CAL_CHECKSUM, 9547);
+			//cs35l41_reg_write(pDevice, CH_BAL, 0x400000);
+			cs35l41_reg_bulk_write(pDevice, CSPL_UPDATE_PARAMS_CONFIG, &settingsTR, sizeof(settingsTR));
+            break;
+        case 2: //BOTTOM LEFT
+            cs35l41_reg_write(pDevice, CAL_R, 9913);
+			cs35l41_reg_write(pDevice, CAL_CHECKSUM, 9914);
+			cs35l41_reg_bulk_write(pDevice, CSPL_UPDATE_PARAMS_CONFIG, &settingsBL, sizeof(settingsBL));
+            break;
+        case 3: //TOP LEFT
+            cs35l41_reg_write(pDevice, CAL_R, 9438);
+			cs35l41_reg_write(pDevice, CAL_CHECKSUM, 9439);
+			//cs35l41_reg_write(pDevice, CH_BAL, 0x400000);
+			cs35l41_reg_bulk_write(pDevice, CSPL_UPDATE_PARAMS_CONFIG, &settingsTL, sizeof(settingsTL));
+            break;
+        default:
+            cs35l41_reg_write(pDevice, CAL_R, 8392);
+			cs35l41_reg_write(pDevice, CAL_CHECKSUM, 8393);
+    }
+	cs35l41_reg_write(pDevice, CAL_STATUS, 1);
+
+	cs35l41_reg_write(pDevice, CSPL_COMMAND, CSPL_CMD_UPDATE_PARAM);
+
+	for (int i = 0; i < 5; i++) {
+		cs35l41_reg_read(pDevice, CSPL_STATE, &st_ctl);
+		if (st_ctl == CSPL_ST_RUNNING) {
+			Cs35l41Print(DEBUG_LEVEL_VERBOSE, DBG_INIT,
+				"CSPL STATE == RUNNING (%u attempt)\n", i);
+			fw_running = TRUE;
+			break;
+		}
+
+		udelay(100);
+	}
+
+	if (!fw_running) {
+		Cs35l41Print(DEBUG_LEVEL_VERBOSE, DBG_INIT,
+			"CSPL_STATE (%d) is not running\n", st_ctl);
+		status = STATUS_UNSUCCESSFUL;
+	}
+
+	return status;
+}
+
 NTSTATUS cs35l41_dsp_init(PCS35L41_CONTEXT pDevice) {
 	NTSTATUS status = STATUS_SUCCESS;
 

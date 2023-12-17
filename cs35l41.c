@@ -1230,6 +1230,11 @@ StartCodec(
 	if (!NT_SUCCESS(status))
 		return status;
 
+	//Setup algorithm coefficients for nabu
+	status = cs35l41_dsp_configure(pDevice);
+	if (!NT_SUCCESS(status))
+		return status;
+
 	status = cs35l41_dsp_run(pDevice);
 	if (!NT_SUCCESS(status))
 		return status;
@@ -1278,6 +1283,9 @@ StartCodec(
 	cs35l41_reg_write(pDevice, CS35L41_PWR_CTRL2, 0x00003721);
 
 	cs35l41_reg_write(pDevice, CS35L41_PWR_CTRL3, 0x01100010);
+
+	cs35l41_reg_update_bits(pDevice, CS35L41_VPBR_CFG, 0x7FFFFFF, 33575688);
+	cs35l41_reg_update_bits(pDevice, CS35L41_NG_CFG, 0x3FFF, 16245);
 
 	Cs35l41Print(DEBUG_LEVEL_INFO, DBG_INIT,
 		"Started! REV:%X UID:%d\n", reg_revid, pDevice->UID);

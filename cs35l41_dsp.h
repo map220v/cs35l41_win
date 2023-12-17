@@ -99,6 +99,43 @@
  */
 #define HALO_CORE_SOFT_RESET_MASK           0x00000001
 
+enum halo_state {
+	HALO_STATE_CODE_INIT_DOWNLOAD = 0,
+	HALO_STATE_CODE_START,
+	HALO_STATE_CODE_RUN
+};
+
+enum cs35l41_cspl_cmd {
+	CSPL_CMD_NONE			= 0,
+	CSPL_CMD_MUTE			= 1,
+	CSPL_CMD_UNMUTE			= 2,
+	CSPL_CMD_UPDATE_PARAM	= 8,
+};
+
+enum cs35l41_cspl_st {
+	CSPL_ST_RUNNING			= 0,
+	CSPL_ST_ERROR			= 1,
+	CSPL_ST_MUTED			= 2,
+	CSPL_ST_REINITING		= 3,
+	CSPL_ST_DIAGNOSING		= 6,
+};
+
+/* 0x400a4 FIRMWARE_HALO_CSPL */
+#define HALO_STATE							0x02800780
+
+/* 0xcd CSPL */
+#define CSPL_COMMAND						0x02800254
+#define CSPL_STATE							0x02800258
+#define CAL_R								0x02800268
+#define CAL_AMBIENT							0x0280026c
+#define CAL_STATUS							0x02800270
+#define	CAL_CHECKSUM						0x02800274
+#define CAL_R_SELECTED						0x02800278
+#define CH_BAL								0x02800374
+#define CSPL_UPDATE_PARAMS_CONFIG			0x03400038
+
+/* 0xf20b EVENT_LOGGER */
+
 #pragma pack(push, 1)
 struct wmfw_header {
 	INT8 magic[4];
@@ -260,5 +297,6 @@ struct cs_dsp_coeff_parsed_coeff {
 
 NTSTATUS cs35l41_dsp_init(PCS35L41_CONTEXT pDevice);
 NTSTATUS cs35l41_dsp_run(PCS35L41_CONTEXT pDevice);
+NTSTATUS cs35l41_dsp_configure(PCS35L41_CONTEXT pDevice);
 
 #endif
